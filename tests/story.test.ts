@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { STAGE_SCENES, TOPICS, greetingScene, pickTalk } from "../src/story/scripts.ts";
 import type { TodayStats } from "../src/care/Care.ts";
+import { cleanName, personalize } from "../src/story/personalize.ts";
 
 const today = (over: Partial<TodayStats> = {}): TodayStats => ({
   day: "2026-09-15", feedSec: 0, groomSec: 0, scares: 0, pets: 0, meals: 0, talks: 0, ...over,
@@ -36,5 +37,22 @@ describe("대본", () => {
     expect(text).toContain("딸기 2개");
     expect(text).toContain("8초");
     expect(text).toContain("1번이나 놀래켰");
+  });
+});
+
+describe("이름 넣기", () => {
+  it("받침에 맞춰 조사를 고른다", () => {
+    const names = { name: "온나", me: "민준" };
+    expect(personalize("{me:을/를} 좋아해", names)).toBe("민준을 좋아해");
+    expect(personalize("{me:을/를} 좋아해", { ...names, me: "너" })).toBe("너를 좋아해");
+    expect(personalize("{name:이/가} 왔어", names)).toBe("온나가 왔어");
+    expect(personalize("{me:이랑/랑}이면", { ...names, me: "주인님" })).toBe("주인님이랑이면");
+    expect(personalize("{name}…?", names)).toBe("온나…?");
+    expect(personalize("Alex{me:이/가}", { ...names, me: "Alex" })).toBe("AlexAlex가");
+  });
+
+  it("이름 입력은 공백을 정리하고 8자로 자르고, 비면 기본값", () => {
+    expect(cleanName("  초파리   공주님입니다요  ", "온나")).toBe("초파리 공주님입");
+    expect(cleanName("   ", "온나")).toBe("온나");
   });
 });

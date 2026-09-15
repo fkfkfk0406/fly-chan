@@ -3,7 +3,8 @@ import { BEHAVIOR_LABEL, Controller } from "./behavior/Controller.ts";
 import { BodyScene } from "./body/BodyScene.ts";
 import { createFallbackRig, loadVrmRig } from "./body/Rig.ts";
 import { NeuralField } from "./brain/NeuralField.ts";
-import { Care, STAGES } from "./care/Care.ts";
+import { Care, DAILY_AFFECTION_CAP, STAGES } from "./care/Care.ts";
+import { DEFAULT_NAMES, cleanName } from "./story/personalize.ts";
 import { burst } from "./fx/Hearts.ts";
 import { Sfx } from "./fx/Sfx.ts";
 import { Director } from "./story/Director.ts";
@@ -129,7 +130,7 @@ const dialog = new DialogBox($("dialog"), {
     sfx.choice();
     // 대화로 오르는 애정은 하루 다섯 번까지만
     const talks = care.todayStats(Date.now()).talks;
-    care.bump(choice.mood ?? 0, talks <= 5 ? choice.affection ?? 0 : 0);
+    care.bump(choice.mood ?? 0, talks <= 5 ? choice.affection ?? 0 : 0); // 하루 상한은 Care 가 한 번 더 건다
     if ((choice.affection ?? 0) > 0 || (choice.mood ?? 0) > 0) {
       const at = anchor();
       burst(at.x, at.y, 4);
@@ -184,15 +185,14 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
       break;
     case "ready":
       meta = msg.meta;
-      $("neuron-title").textContent = `온나의 뇌 · 뉴런 ${meta.neurons.toLocaleString()}개`;
+      applyNames();
       $("source").textContent =
         `FlyWire v783 · 시냅스 ${(meta.synapses / 1e6).toFixed(1)}M · LIF dt ${DT_MS} ms` +
         (ADAPTATION.b ? ` · 적응 ${ADAPTATION.tauW} ms/${ADAPTATION.b} mV` : "") +
         (TIME_SCALE !== 1 ? ` · 시간 ${TIME_SCALE}배속` : "");
-      $("overlay").hidden = true;
       ready = true;
-      if (care.s.asleep) say("💤", 2, true);
-      else director.greetIfNeeded(Date.now());
+      $("load-label").textContent = care.named ? "" : "이름을 지어 주면 깨어나요";
+      if (care.named) wakeUp();
       break;
     case "frame":
       onFrame(msg);
@@ -222,6 +222,51 @@ async function openBrain() {
   ]);
   neural = new NeuralField($("neural-view"), new Float32Array(pos), new Uint8Array(cls), meta.classes);
 }
+
+// ---------------------------------------------------------------- 이름·첫 만남
+const charName = () => care.s.name || DEFAULT_NAMES.name;
+
+function applyNames() {
+  const name = charName();
+  for (const el of document.querySelectorAll("[data-name]")) el.textContent = name;
+  for (const el of document.querySelectorAll("[data-name-upper]")) el.textContent = name.toUpperCase();
+  document.title = `${name} · 초파리 뇌를 가진 소녀`;
+  if (meta) $("neuron-title").textContent = `${name}의 뇌 · 뉴런 ${meta.neurons.toLocaleString()}개`;
+}
+
+/** 뇌가 준비되고 이름도 지었으면 방을 보여 준다 */
+function wakeUp() {
+  if (!ready || !care.named) return;
+  $("overlay").hidden = true;
+  if (care.s.asleep) say("💤", 2, true);
+  else director.greetIfNeeded(Date.now());
+}
+
+function showNaming() {
+  $("overlay").hidden = false;
+  $("naming").hidden = false;
+  $<HTMLInputElement>("input-name").value = "";
+  $<HTMLInputElement>("input-me").value = "";
+  $("load-label").textContent = ready ? "" : "뇌를 깨우는 중…";
+  $<HTMLInputElement>("input-name").focus();
+}
+
+$("naming").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const now = Date.now();
+  care.setNames(
+    cleanName($<HTMLInputElement>("input-name").value, DEFAULT_NAMES.name),
+    cleanName($<HTMLInputElement>("input-me").value, DEFAULT_NAMES.me),
+    now,
+  );
+  care.save(now);
+  $("naming").hidden = true;
+  applyNames();
+  if (!ready) $("load-label").textContent = `${charName()}의 뇌를 깨우는 중…`;
+  wakeUp();
+});
+if (!care.named) showNaming();
+applyNames();
 
 // ---------------------------------------------------------------- 돌봄
 function giveFood(kind: FoodKind) {
@@ -320,13 +365,14 @@ $("sim-toggle").onclick = () => {
 $("btn-restart").onclick = () => {
   if (!confirm("지금까지의 애정과 일기가 모두 사라져요. 처음부터 다시 키울까요?")) return;
   care.reset(Date.now());
+  togglePanel("diary-panel", false);
+  showNaming();
   controller.state = Controller.initialState();
   habitat.foods = [];
   habitat.lightsOn = true;
   send({ type: "reset" });
   updateLightButton();
-  renderDiary();
-  say("안녕!");
+  applyNames();
 };
 updateLightButton();
 
@@ -425,8 +471,8 @@ function updateUi() {
   setGauge("g-mood", s.mood);
   setGauge("g-clean", care.cleanliness);
   setGauge("g-love", s.affection);
-  $("days").textContent = `함께한 지 ${care.daysTogether(Date.now())}일`;
-  $("stage").textContent = `💞 ${STAGES[Math.min(care.stage, care.s.stageSeen)].name}`;
+  $("days").textContent = `함께한 지 ${care.daysTogether()}일`;
+  $("stage").textContent = `💞 ${STAGES[care.s.stageSeen].name}`;
 
   const state = controller.state;
   const label = BEHAVIOR_LABEL[Controller.displayBehavior(state)];
@@ -468,8 +514,8 @@ function renderDiary() {
   const now = Date.now();
   const s = care.s;
   const stats = [
-    ["함께한 날", `${care.daysTogether(now)}일`],
-    ["관계", STAGES[Math.min(care.stage, s.stageSeen)].name],
+    ["함께한 날", `${care.daysTogether()}일`],
+    ["관계", STAGES[s.stageSeen].name],
     ["애정", `${Math.round(s.affection * 100)}%`],
     ["기분", `${Math.round(s.mood * 100)}%`],
     ["청결", `${Math.round(care.cleanliness * 100)}%`],
@@ -483,6 +529,25 @@ function renderDiary() {
     return div;
   });
   $("diary-stats").replaceChildren(...stats);
+
+  // 오늘 모은 마음과 다음 단계 조건
+  const room = care.affectionRoomToday;
+  const hearts = Math.round(((DAILY_AFFECTION_CAP - room) / DAILY_AFFECTION_CAP) * 5);
+  const next = care.nextStage();
+  const hint = document.createElement("p");
+  hint.className = "next-stage";
+  hint.textContent =
+    `오늘 모은 마음 ${"♥".repeat(hearts)}${"♡".repeat(5 - hearts)}` +
+    (next
+      ? ` · 다음 단계 '${next.name}': ` +
+        [
+          next.affection > 0 ? `애정 ${Math.ceil(next.affection * 100)}% 더` : "애정 충분",
+          next.days > 0 ? `함께한 날 ${next.days}일 더` : "함께한 날 충분",
+          next.moodOk ? "기분 좋음" : "기분이 좋을 때",
+        ].join(", ")
+      : " · 이미 연인이에요 💞");
+  $("diary-stats").after(hint);
+  hint.previousElementSibling?.parentElement?.querySelectorAll(".next-stage").forEach((el) => el !== hint && el.remove());
 
   const today = new Date(now).toDateString();
   $("diary-list").replaceChildren(

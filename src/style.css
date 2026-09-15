@@ -309,6 +309,22 @@ body.talking .dock, body.talking .status, body.talking .bubble { display: none; 
 .progress i { display: block; height: 100%; width: 0; background: var(--accent); }
 .loading .fine { color: var(--muted); }
 .loading.error p { color: var(--low); }
+.naming { display: grid; gap: 10px; text-align: left; margin: 6px 0 10px; }
+.naming .lead { margin: 0 0 4px; text-align: center; color: var(--ink); }
+.naming label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.naming input {
+  font: inherit;
+  font-size: 16px;
+  padding: 10px 12px;
+  border: 1px solid #f0c9d3;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+}
+.naming input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.naming button { padding: 11px; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 700; }
+.naming.done { display: none; }
+.next-stage { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.6; }
 
 @media (max-width: 640px) {
   .gauges { gap: 0; padding: 6px 6px; flex-wrap: nowrap; }

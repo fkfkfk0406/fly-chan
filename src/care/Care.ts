@@ -1,5 +1,6 @@
 // 다마고치식 돌봄 상태. 뇌 시뮬레이션 밖의 "게임 상태"다.
 // 배고픔만 뇌에 닿는다(배고플수록 당 GRN 입력이 세짐, Habitat.sense). 나머지는 행동 선택·표정·말풍선에 쓴다.
+import { hasBatchim } from "../story/personalize.ts";
 import { ROOM_HALF, insideBed } from "../world/Habitat.ts";
 
 export type CareEvent =
@@ -14,14 +15,20 @@ export interface Mess {
   z: number;
 }
 
-/** 관계 단계. 애정이 min 이상이면 그 단계 */
+/**
+ * 관계 단계. 초파리의 마음은 쉽게 열리지 않는다:
+ * 애정(min) + 함께한 날(minDays)을 채우고, 그 순간 기분이 좋아야(MOOD_TO_ADVANCE) 다음 단계로 간다.
+ */
 export const STAGES = [
-  { name: "낯섦", min: 0 },
-  { name: "친구", min: 0.35 },
-  { name: "호감", min: 0.55 },
-  { name: "두근두근", min: 0.75 },
-  { name: "연인", min: 0.92 },
+  { name: "낯섦", min: 0, minDays: 0 },
+  { name: "친구", min: 0.2, minDays: 1 },
+  { name: "호감", min: 0.45, minDays: 3 },
+  { name: "두근두근", min: 0.7, minDays: 5 },
+  { name: "연인", min: 0.92, minDays: 7 },
 ] as const;
+export const MOOD_TO_ADVANCE = 0.6;
+/** 하루(게임 시간 24h)에 오를 수 있는 애정 상한 */
+export const DAILY_AFFECTION_CAP = 0.06;
 
 /** 오늘 하루 기록 (뇌 출력 기반 대화에 쓴다) */
 export interface TodayStats {
@@ -50,8 +57,18 @@ export interface CareState {
   messes: Mess[];
   /** 다음 먼지가 생길 때까지 남은 게임 시간 (h) */
   dustIn: number;
+  /** 캐릭터 이름과 캐릭터가 나를 부르는 호칭. 비어 있으면 아직 이름을 짓지 않음 */
+  name: string;
+  callMe: string;
+  /** 첫 만남 장면을 봤는지 */
+  introDone: boolean;
   /** 이벤트를 이미 본 가장 높은 관계 단계 */
   stageSeen: number;
+  /** 함께 보낸 게임 시간 (h). 함께한 날 = 24h 단위 */
+  gameHours: number;
+  /** 애정 상한을 세는 게임 날짜와 그날 얻은 애정 */
+  gainDay: number;
+  gainToday: number;
   /** 마지막으로 시간대 인사를 한 날 */
   greetedDay: string;
   today: TodayStats;
@@ -62,20 +79,24 @@ export interface CareState {
   diary: DiaryEntry[];
 }
 
-const KEY = "onna-care-v1";
+// 난이도를 바꾸면서 저장 형식이 달라져 새로 시작한다
+const KEY = "onna-care-v2";
+const OLD_KEYS = ["onna-care-v1"];
 const HOUR = 3600;
 const OFFLINE_CAP_H = 72;
 const DIARY_MAX = 60;
 
-// 시간당 변화량 (실제 시간 기준)
+// 시간당 변화량 (게임 시간 기준)
 const RATE = {
   hungerAwake: 0.3,
   hungerAsleep: 0.12,
   sleepyAwake: 0.2,
   sleepRecover: 4, // 15분이면 개운
   neglect: 0.05, // 배고픔이 한계일 때 애정 감소
+  dirty: 0.01, // 방이 많이 지저분할 때 애정 감소
   dustEvery: 1.5, // 시간마다 먼지 한 뭉치
 };
+const LONELY_PER_DAY = 0.02; // 하루 넘게 안 오면 하루마다 애정 감소
 const MESS_MAX = 6;
 const MESS_WEIGHT = 0.18; // 얼룩 하나당 청결도 감소
 
@@ -105,11 +126,13 @@ export class Care {
 
   static fresh(now: number): CareState {
     return {
-      hunger: 0.45, sleepiness: 0.2, mood: 0.6, affection: 0.3,
+      hunger: 0.45, sleepiness: 0.2, mood: 0.55, affection: 0.05,
       asleep: false, lightsOn: true, messes: [], dustIn: RATE.dustEvery,
-      stageSeen: 0, greetedDay: "", today: emptyToday(now), recentTalks: [],
+      name: "", callMe: "", introDone: false,
+      stageSeen: 0, gameHours: 0, gainDay: 0, gainToday: 0,
+      greetedDay: "", today: emptyToday(now), recentTalks: [],
       bornAt: now, lastSeen: now,
-      diary: [{ t: now, text: "온나가 방에 왔어요." }],
+      diary: [],
     };
   }
 
@@ -117,6 +140,7 @@ export class Care {
   static load(now: number, timeScale = 1): Care {
     let saved: CareState | null = null;
     try {
+      for (const k of OLD_KEYS) localStorage.removeItem(k);
       const raw = localStorage.getItem(KEY);
       if (raw) saved = { ...Care.fresh(now), ...JSON.parse(raw) };
     } catch {
@@ -138,11 +162,14 @@ export class Care {
       this.passTime((hours * HOUR) / steps / this.timeScale);
       if (this.s.asleep && this.s.sleepiness <= 0) this.s.asleep = false;
     }
+    const lonely = Math.max(0, hours - 24) / 24;
+    this.s.affection = clamp01(this.s.affection - LONELY_PER_DAY * lonely);
     this.s.lastSeen = now;
     const away = hours >= 1 ? `${Math.floor(hours)}시간` : `${Math.round(hours * 60)}분`;
     const notes = [
       this.s.hunger > 0.85 && "배가 많이 고파 보여요.",
       this.cleanliness < 0.5 && "방에 먼지가 쌓였어요.",
+      lonely > 0 && "오래 혼자 있어서 조금 서운해해요.",
       wasAsleep && !this.s.asleep && "그사이 푹 자고 일어났어요.",
     ].filter(Boolean);
     this.log(now, [`${away} 동안 기다렸어요.`, ...notes].join(" "));
@@ -152,6 +179,7 @@ export class Care {
   passTime(realSec: number): void {
     const h = (realSec * this.timeScale) / HOUR;
     const s = this.s;
+    s.gameHours += h;
     if (s.asleep) {
       s.hunger = clamp01(s.hunger + RATE.hungerAsleep * h);
       s.sleepiness = clamp01(s.sleepiness - RATE.sleepRecover * h);
@@ -160,6 +188,7 @@ export class Care {
       s.sleepiness = clamp01(s.sleepiness + RATE.sleepyAwake * h);
     }
     if (s.hunger >= 0.95) s.affection = clamp01(s.affection - RATE.neglect * h);
+    if (this.cleanliness < 0.4) s.affection = clamp01(s.affection - RATE.dirty * h);
 
     s.dustIn -= h;
     if (s.dustIn <= 0) {
@@ -169,13 +198,18 @@ export class Care {
 
     // 기분은 애정·배고픔·졸림·청결이 정하는 기준값으로 천천히(τ 2분) 돌아간다
     const target = clamp01(
-      0.55 + 0.35 * (s.affection - 0.5) - 0.45 * Math.max(0, s.hunger - 0.6) -
+      0.5 + 0.35 * (s.affection - 0.5) - 0.45 * Math.max(0, s.hunger - 0.6) -
         0.35 * Math.max(0, s.sleepiness - 0.75) - 0.3 * Math.max(0, 0.7 - this.cleanliness),
     );
     s.mood += (target - s.mood) * (1 - Math.exp(-realSec / 120));
   }
 
-  /** 현재 애정으로 정해지는 관계 단계 (0-4) */
+  /** 함께한 날 (게임 시간 기준, 첫날 = 1) */
+  daysTogether(): number {
+    return Math.floor(this.s.gameHours / 24) + 1;
+  }
+
+  /** 애정 수치만으로 도달한 단계 (0-4) */
   get stage(): number {
     let k = 0;
     STAGES.forEach((st, i) => {
@@ -184,9 +218,23 @@ export class Care {
     return k;
   }
 
-  /** 아직 이벤트를 보지 않은 새 단계가 있으면 그 단계 */
+  /** 다음 단계로 가기 위해 남은 조건 */
+  nextStage(): { name: string; affection: number; days: number; moodOk: boolean } | null {
+    const next = STAGES[this.s.stageSeen + 1];
+    if (!next) return null;
+    return {
+      name: next.name,
+      affection: Math.max(0, next.min - this.s.affection),
+      days: Math.max(0, next.minDays - (this.daysTogether() - 1)),
+      moodOk: this.s.mood >= MOOD_TO_ADVANCE,
+    };
+  }
+
+  /** 모든 조건을 채운 다음 단계가 있으면 그 단계 */
   pendingStage(): number | null {
-    return this.stage > this.s.stageSeen ? this.s.stageSeen + 1 : null;
+    const next = this.nextStage();
+    if (!next || next.affection > 0 || next.days > 0 || !next.moodOk) return null;
+    return this.s.stageSeen + 1;
   }
 
   markStageSeen(stage: number, now: number): void {
@@ -201,9 +249,30 @@ export class Care {
     return this.s.today;
   }
 
+  /** 오늘(게임 날짜) 더 얻을 수 있는 애정 */
+  get affectionRoomToday(): number {
+    this.rollGainDay();
+    return Math.max(0, DAILY_AFFECTION_CAP - this.s.gainToday);
+  }
+
+  private rollGainDay(): void {
+    const day = Math.floor(this.s.gameHours / 24);
+    if (day !== this.s.gainDay) {
+      this.s.gainDay = day;
+      this.s.gainToday = 0;
+    }
+  }
+
+  /** 기분·애정 변화. 오르는 애정만 하루 상한이 걸리고, 깎이는 건 그대로 */
   bump(mood: number, affection = 0): void {
     this.s.mood = clamp01(this.s.mood + mood);
-    this.s.affection = clamp01(this.s.affection + affection);
+    if (affection > 0) {
+      const gain = Math.min(affection, this.affectionRoomToday);
+      this.s.gainToday += gain;
+      this.s.affection = clamp01(this.s.affection + gain);
+    } else {
+      this.s.affection = clamp01(this.s.affection + affection);
+    }
   }
 
   /** 0 엉망 → 1 깨끗 */
@@ -235,8 +304,7 @@ export class Care {
     s.messes = id === undefined ? [] : s.messes.filter((m) => m.id !== id);
     const removed = before - s.messes.length;
     if (!removed) return "이미 깨끗해!";
-    s.mood = clamp01(s.mood + 0.04 * removed);
-    s.affection = clamp01(s.affection + 0.01 * removed);
+    this.bump(0.04 * removed, 0.004 * removed);
     if (!s.messes.length) {
       this.log(now, "방을 깨끗하게 청소해 줬어요.");
       return "반짝반짝✨";
@@ -252,40 +320,45 @@ export class Care {
   /** 돌봄 이벤트 반영. 말풍선에 띄울 짧은 대사를 돌려준다 */
   on(event: CareEvent, now: number): string | null {
     const s = this.s;
-    const bump = (mood: number, affection = 0) => this.bump(mood, affection);
     const today = this.todayStats(now);
     if (event === "ate") today.meals++;
     if (event === "scared") today.scares++;
     if (event === "petted") today.pets++;
     switch (event) {
       case "ate":
-        bump(0.15, s.hunger > 0.2 ? 0.03 : 0.01);
+        // 배고플 때 준 밥이어야 마음이 움직인다
+        this.bump(0.15, s.hunger > 0.5 ? 0.012 : 0);
         this.log(now, "딸기를 먹었어요.");
         return "냠냠";
       case "full":
         return "배불러~";
       case "bitter":
-        bump(-0.2, -0.02);
-        this.log(now, "쓴 버섯을 맛보고 뒷걸음쳤어요.");
-        return "우웩";
+        this.bump(-0.25, -0.04);
+        this.log(now, "쓴 버섯을 맛보고 뒷걸음쳤어요. 조금 원망하는 눈치예요.");
+        return "우웩…";
       case "scared":
-        bump(-0.25, -0.03);
-        this.log(now, "깜짝 놀라서 뛰어올랐어요.");
+        this.bump(-0.3, -0.05);
+        this.log(now, "깜짝 놀라서 뛰어올랐어요. 한동안 경계할 것 같아요.");
         return "꺅!";
       case "woken":
         s.asleep = false;
-        bump(-0.15);
-        this.log(now, "자다가 깼어요.");
-        return "으응…";
+        this.bump(-0.2, -0.03);
+        this.log(now, "자다가 깼어요. 기분이 좋지 않아요.");
+        return "으응… 왜 깨워";
       case "petted": {
         this.petTimes = [...this.petTimes.filter((t) => now - t < 20_000), now];
-        if (this.petTimes.length > 4) {
-          bump(-0.05);
-          return "그만~";
+        if (this.petTimes.length > 3) {
+          this.bump(-0.08, -0.02);
+          return "그만 좀 해!";
         }
-        bump(0.12, 0.015);
+        // 기분이 나쁠 때는 손을 탄다
+        if (s.mood < 0.4) {
+          this.bump(-0.02);
+          return "흥…";
+        }
+        this.bump(0.08, 0.006);
         if (this.petTimes.length === 1) this.log(now, "쓰다듬어 줬어요.");
-        return s.affection > 0.7 ? "헤헤♡" : "헤헤";
+        return this.s.stageSeen >= 3 ? "헤헤♡" : this.s.stageSeen >= 1 ? "헤헤" : "…";
       }
       case "sleep":
         s.asleep = true;
@@ -298,6 +371,17 @@ export class Care {
     }
   }
 
+  get named(): boolean {
+    return this.s.name !== "";
+  }
+
+  setNames(name: string, callMe: string, now: number): void {
+    const first = !this.named;
+    this.s.name = name;
+    this.s.callMe = callMe;
+    if (first) this.log(now, `낯선 방에 ${name}${hasBatchim(name) ? "이" : "가"} 왔어요. 아직 경계하는 눈치예요.`);
+  }
+
   setLights(on: boolean, now: number): void {
     if (this.s.lightsOn === on) return;
     this.s.lightsOn = on;
@@ -307,10 +391,6 @@ export class Care {
   log(now: number, text: string): void {
     this.s.diary.unshift({ t: now, text });
     this.s.diary.length = Math.min(this.s.diary.length, DIARY_MAX);
-  }
-
-  daysTogether(now: number): number {
-    return Math.floor((now - this.s.bornAt) / 86_400_000) + 1;
   }
 
   save(now: number): void {

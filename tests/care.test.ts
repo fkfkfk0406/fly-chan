@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { Care } from "../src/care/Care.ts";
+import { Care, DAILY_AFFECTION_CAP } from "../src/care/Care.ts";
 
 // Node 에는 localStorage 가 없으니 메모리 구현을 붙인다
 const store = new Map<string, string>();
@@ -7,6 +7,7 @@ Object.assign(globalThis, {
   localStorage: {
     getItem: (k: string) => store.get(k) ?? null,
     setItem: (k: string, v: string) => void store.set(k, v),
+    removeItem: (k: string) => void store.delete(k),
   },
 });
 
@@ -15,10 +16,23 @@ const H = 3.6e6;
 describe("Care", () => {
   beforeEach(() => store.clear());
 
-  it("처음 열면 새 상태로 시작한다", () => {
+  it("처음 열면 이름 없는 새 상태로 시작하고, 이름을 지으면 일기에 남는다", () => {
     const care = Care.load(0);
-    expect(care.s.diary[0].text).toContain("왔어요");
-    expect(care.s.hunger).toBeCloseTo(0.45);
+    expect(care.named).toBe(false);
+    expect(care.s.affection).toBeCloseTo(0.05);
+    care.setNames("민트", "주인님", 0);
+    expect(care.named).toBe(true);
+    expect(care.s.diary[0].text).toContain("민트가 왔어요");
+    care.setNames("별", "너", 0);
+    expect(care.s.diary[0].text).toContain("민트가 왔어요"); // 이미 지었으면 일기는 그대로
+    expect(care.s.name).toBe("별");
+  });
+
+  it("예전 저장 형식(v1)은 지우고 새로 시작한다", () => {
+    store.set("onna-care-v1", JSON.stringify({ affection: 1, stageSeen: 4 }));
+    const care = Care.load(0);
+    expect(store.has("onna-care-v1")).toBe(false);
+    expect(care.s.stageSeen).toBe(0);
   });
 
   it("닫아 둔 시간만큼 배고픔·졸림이 늘고 일기에 남는다", () => {
@@ -55,10 +69,20 @@ describe("Care", () => {
   it("쓰다듬기는 기분·애정을 올리지만, 연달아 너무 많이 하면 싫어한다", () => {
     const care = Care.load(0);
     const mood = care.s.mood;
-    expect(care.on("petted", 0)).toMatch(/헤헤/);
+    expect(care.on("petted", 0)).toBe("…"); // 낯섦 단계에서는 아직 말이 없다
     expect(care.s.mood).toBeGreaterThan(mood);
-    for (let k = 1; k <= 4; k++) care.on("petted", k * 1000);
-    expect(care.on("petted", 5000)).toBe("그만~");
+    for (let k = 1; k <= 2; k++) care.on("petted", k * 1000);
+    const affection = care.s.affection;
+    expect(care.on("petted", 3000)).toBe("그만 좀 해!");
+    expect(care.s.affection).toBeLessThan(affection);
+  });
+
+  it("기분이 나쁘면 쓰다듬어도 애정이 오르지 않는다", () => {
+    const care = Care.load(0);
+    care.s.mood = 0.2;
+    const affection = care.s.affection;
+    expect(care.on("petted", 0)).toBe("흥…");
+    expect(care.s.affection).toBe(affection);
   });
 
   it("놀래키기·쓴 버섯은 기분과 애정을 깎는다", () => {
@@ -121,23 +145,35 @@ describe("Care 청소", () => {
 describe("Care 관계 단계", () => {
   beforeEach(() => store.clear());
 
-  it("애정에 따라 단계가 정해지고, 새 단계는 한 번만 이벤트 대기", () => {
+  it("단계는 애정·함께한 날·좋은 기분을 모두 채워야 오르고, 한 단계씩만 오른다", () => {
     const care = Care.load(0);
-    care.s.affection = 0.3;
-    expect(care.stage).toBe(0);
-    expect(care.pendingStage()).toBeNull();
-    care.s.affection = 0.8; // 두근두근(3) 까지 한 번에 올라도 한 단계씩 보여준다
-    expect(care.stage).toBe(3);
+    care.s.affection = 0.8;
+    care.s.mood = 0.9;
+    expect(care.pendingStage()).toBeNull(); // 첫날: 친구(1일) 조건 미달
+    care.s.gameHours = 24;
     expect(care.pendingStage()).toBe(1);
     care.markStageSeen(1, 0);
+    expect(care.pendingStage()).toBeNull(); // 호감은 3일
+    care.s.gameHours = 24 * 3;
+    care.s.mood = 0.4;
+    expect(care.pendingStage()).toBeNull(); // 기분이 나쁘면 안 오른다
+    expect(care.nextStage()).toMatchObject({ name: "호감", affection: 0, days: 0, moodOk: false });
+    care.s.mood = 0.7;
     expect(care.pendingStage()).toBe(2);
     care.markStageSeen(2, 0);
-    care.markStageSeen(3, 0);
-    expect(care.pendingStage()).toBeNull();
-    expect(care.s.diary[0].text).toContain("두근두근");
-    care.s.affection = 0.1; // 애정이 떨어져도 본 이벤트는 다시 안 나온다
-    care.s.affection = 0.8;
-    expect(care.pendingStage()).toBeNull();
+    expect(care.s.diary[0].text).toContain("호감");
+  });
+
+  it("애정은 하루에 정해진 만큼만 오르고, 다음 날 다시 오른다", () => {
+    const care = Care.load(0);
+    const start = care.s.affection;
+    for (let k = 0; k < 20; k++) care.bump(0, 0.02);
+    expect(care.s.affection - start).toBeCloseTo(DAILY_AFFECTION_CAP, 5);
+    care.bump(0, -0.03); // 깎이는 건 상한과 무관
+    expect(care.s.affection - start).toBeCloseTo(DAILY_AFFECTION_CAP - 0.03, 5);
+    care.passTime(24 * 3600);
+    care.bump(0, 0.02);
+    expect(care.affectionRoomToday).toBeCloseTo(DAILY_AFFECTION_CAP - 0.02, 5);
   });
 
   it("오늘 기록은 날짜가 바뀌면 새로 시작한다", () => {

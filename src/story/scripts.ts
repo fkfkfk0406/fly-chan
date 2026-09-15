@@ -36,7 +36,7 @@ export const STAGE_SCENES: Record<number, Scene> = {
     id: "stage-1",
     lines: [
       L("저기… 요즘 계속 챙겨 줘서 고마워.", "relaxed"),
-      L("처음엔 좀 무서웠는데, 이제는 네가 오면 더듬이가 먼저 반응해.", "happy"),
+      L("처음엔 좀 무서웠는데, 이제는 {me:이/가} 오면 더듬이가 먼저 반응해.", "happy"),
     ],
     choices: [
       { label: "우리 친구 하자!", mood: 0.1, affection: 0.03, reply: [L("응! 오늘부터 친구야 ✨", "happy")] },
@@ -46,7 +46,7 @@ export const STAGE_SCENES: Record<number, Scene> = {
   2: {
     id: "stage-2",
     lines: [
-      L("있잖아… 너만 오면 MN9가 두근거리는 것 같아.", "relaxed"),
+      L("있잖아… {me}만 오면 MN9가 두근거리는 것 같아.", "relaxed"),
       L("아, MN9는 딸기 먹을 때 쓰는 뉴런이긴 한데…", "surprised"),
     ],
     choices: [
@@ -57,8 +57,8 @@ export const STAGE_SCENES: Record<number, Scene> = {
   3: {
     id: "stage-3",
     lines: [
-      L("요즘 이상해. 네가 늦게 오면 방이 너무 넓어 보여.", "sad"),
-      L("그리고 네가 오면… 날개가 저절로 파닥거려.", "happy"),
+      L("요즘 이상해. {me:이/가} 늦게 오면 방이 너무 넓어 보여.", "sad"),
+      L("그리고 {me:이/가} 오면… 날개가 저절로 파닥거려.", "happy"),
     ],
     choices: [
       { label: "매일 올게", mood: 0.1, affection: 0.03, reply: [L("약속이야! 새끼손가락은 없으니까… 더듬이 걸기!", "happy")] },
@@ -70,13 +70,36 @@ export const STAGE_SCENES: Record<number, Scene> = {
     lines: [
       L("나… 뉴런이 13만 8천 개밖에 없어서 복잡한 말은 잘 못해.", "relaxed"),
       L("그래도 이건 확실해.", "neutral"),
-      L("너를 좋아해.", "happy"),
+      L("{me:을/를} 좋아해.", "happy"),
     ],
     choices: [
       { label: "나도 좋아해", mood: 0.2, affection: 0.05, reply: [L("헤헤… 오늘부터 1일이다♡", "happy")] },
       { label: "13만 개면 충분해", mood: 0.15, affection: 0.05, reply: [L("…그 말, 시냅스 5천만 개에 저장해 둘게.", "happy")] },
     ],
   },
+};
+
+// ---------------------------------------------------------------- 첫 만남
+export const INTRO_SCENE: Scene = {
+  id: "intro",
+  lines: [
+    L("……여긴 어디야?", "surprised"),
+    L("머릿속이 반짝반짝해. 뉴런이 13만 8천 개나 켜지고 있어.", "surprised"),
+    L("{name}…? 그게 내 이름이야?", "neutral"),
+  ],
+  choices: [
+    {
+      label: "응, 반가워",
+      mood: 0.05,
+      affection: 0.01,
+      reply: [L("…반가워. 근데 아직 {me:을/를} 잘 모르겠어.", "relaxed"), L("딸기 주면 생각해 볼게.", "neutral")],
+    },
+    {
+      label: "무서워하지 마",
+      mood: 0.08,
+      reply: [L("무서운 거 아니야! 더듬이가 좀 떨리는 것뿐이야.", "angry")],
+    },
+  ],
 };
 
 // ---------------------------------------------------------------- 인사
@@ -151,15 +174,15 @@ export const TOPICS: Topic[] = [
   ]),
   fixed("dream", 1, [L("자는 동안에도 뇌가 가끔 반짝여. 그게 꿈일까?", "relaxed")], [
     { label: "무슨 꿈 꿨어?", reply: [L("딸기 산에서 데굴데굴 굴러떨어지는 꿈…", "surprised")] },
-    { label: "좋은 꿈 꿔", affection: 0.02, reply: [L("응, 너 나오는 꿈으로!", "happy")] },
+    { label: "좋은 꿈 꿔", affection: 0.02, reply: [L("응, {me} 나오는 꿈으로!", "happy")] },
   ]),
   fixed("jump", 1, [L("누가 갑자기 다가오면 Giant Fiber라는 뉴런이 켜져서, 나도 모르게 뛰어올라.", "surprised")], [
     { label: "그래서 놀래키면 뛰는구나", mood: -0.02, reply: [L("알면서 하지 마!", "angry")] },
     { label: "안 놀래킬게", affection: 0.02, reply: [L("약속했다?", "happy")] },
   ]),
   fixed("window", 2, [L("창밖 세상은 어떤 곳이야?", "relaxed")], [
-    { label: "넓고 시끄러워", affection: 0.02, reply: [L("무섭다… 그래도 너랑이면 가 보고 싶어.", "relaxed")] },
-    { label: "여기가 더 좋아", affection: 0.02, reply: [L("그치? 딸기도 있고, 너도 있고.", "happy")] },
+    { label: "넓고 시끄러워", affection: 0.02, reply: [L("무섭다… 그래도 {me:이랑/랑}이면 가 보고 싶어.", "relaxed")] },
+    { label: "여기가 더 좋아", affection: 0.02, reply: [L("그치? 딸기도 있고, {me}도 있고.", "happy")] },
   ]),
   {
     id: "room",
@@ -183,7 +206,7 @@ export const TOPICS: Topic[] = [
     { label: "내가 알려 줄게", affection: 0.03, reply: [L("…응. 천천히 알려 줘.", "relaxed")] },
     { label: "더듬이로 대신하자", affection: 0.02, reply: [L("그럼 더듬이 걸기다!", "happy")] },
   ]),
-  fixed("future", 4, [L("나중에 뉴런이 더 생기면, 너한테 하고 싶은 말도 늘어날까?", "relaxed")], [
+  fixed("future", 4, [L("나중에 뉴런이 더 생기면, {me}한테 하고 싶은 말도 늘어날까?", "relaxed")], [
     { label: "지금도 충분해", mood: 0.1, affection: 0.02, reply: [L("헤헤… 그럼 지금 말할래. 좋아해♡", "happy")] },
     { label: "기대할게", affection: 0.02, reply: [L("시냅스 열심히 키워 볼게!", "happy")] },
   ]),

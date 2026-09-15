@@ -61,6 +61,10 @@ export class DialogBox {
     }
   }
 
+  setSpeaker(name: string): void {
+    this.root.querySelector(".dialog-name")!.textContent = name;
+  }
+
   private async say(line: Line): Promise<void> {
     this.hooks.onExpr(line.expr);
     this.choices.replaceChildren();

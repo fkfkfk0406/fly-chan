@@ -2,7 +2,6 @@
 // 사용: node scripts/taste_probe.ts [--dt 0.5] [--ms 1000] [--seeds 3] [--only water,ir94e]
 import { LifEngine } from "../src/sim/lif-engine.ts";
 import { loadAll } from "./node-data.ts";
-import type { GroupName } from "../src/sim/data.ts";
 
 const args = process.argv.slice(2);
 const opt = (k: string, d: string) => {
