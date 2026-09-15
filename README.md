@@ -5,7 +5,7 @@
 | 패널 | 내용 |
 |---|---|
 | 01 NEURAL FIELD | 전체 뉴런 점 구름과 실시간 발화, 하강·운동 뉴런 발화율, 현재 걸린 감각 입력 |
-| 02 BODY CAM | 유메카(VRM + 더듬이·날개)의 동작과 그 동작을 일으킨 뉴런 |
+| 02 BODY CAM | 온나(VRM + 더듬이·날개)의 동작과 그 동작을 일으킨 뉴런 |
 | 03 HABITAT MAP | 같은 공간의 상공 화면. 클릭하면 딸기, Shift+클릭하면 쓴 버섯을 놓습니다 |
 
 하단에서 일시정지, 먹이 놓기, 위협(루밍), 더듬이 쓰다듬기, 빛 입력 켜기/끄기, 최근 200초 재시청을 할 수 있습니다.
@@ -69,4 +69,4 @@ Shiu et al. 2024 (Nature) Brian2 모델과 같은 방정식과 파라미터를 �
 
 - FlyWire 커넥톰 v783: Dorkenwald et al. 2024, Schlegel et al. 2024 (Nature). 연결 행렬은 [philshiu/Drosophila_brain_model](https://github.com/philshiu/Drosophila_brain_model), 주석·좌표는 [flyconnectome/flywire_annotations](https://github.com/flyconnectome/flywire_annotations)에서 받습니다.
 - LIF 모델: Shiu et al. 2024, *A Drosophila computational brain model reveals sensorimotor processing*, Nature.
-- 캐릭터: pixiv `VRM1_Constraint_Twist_Sample` (VRM Public License 1.0. 누구나 사용, 상업 이용, 수정·재배포 허용, 표기 불필요). `public/models/yumeka.vrm`을 다른 VRM으로 바꿔도 동작하며, 불러오지 못하면 도형 인형으로 대체합니다.
+- 캐릭터: pixiv `VRM1_Constraint_Twist_Sample` (VRM Public License 1.0. 누구나 사용, 상업 이용, 수정·재배포 허용, 표기 불필요). `public/models/onna.vrm`을 다른 VRM으로 바꿔도 동작하며, 불러오지 못하면 도형 인형으로 대체합니다.

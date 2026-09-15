@@ -14,7 +14,7 @@ MODELS = Path(__file__).parent.parent / "public" / "models"
 
 FILES = {
     # 캐릭터 모델: pixiv VRM 1.0 샘플 (VRM Public License 1.0, 누구나·상업·수정·재배포 허용)
-    str(MODELS / "yumeka.vrm"):
+    str(MODELS / "onna.vrm"):
         "https://raw.githubusercontent.com/vrm-c/vrm-specification/master/samples/VRM1_Constraint_Twist_Sample/vrm/VRM1_Constraint_Twist_Sample.vrm",
     "Completeness_783.csv":
         "https://raw.githubusercontent.com/philshiu/Drosophila_brain_model/main/Completeness_783.csv",

@@ -49,7 +49,7 @@ const sentStim: Record<SensoryGroup, number> = { sugar: 0, bitter: 0, jo_touch: 
 const body = new BodyScene($("body-view"));
 const map = new HabitatMap($("map-view"), (kind, x, z) => placeFood(kind, x, z));
 
-loadVrmRig(`${BASE}models/yumeka.vrm`)
+loadVrmRig(`${BASE}models/onna.vrm`)
   .catch((err) => {
     console.warn("VRM 로드 실패, 도형 인형으로 대체합니다:", err);
     return createFallbackRig();
@@ -292,7 +292,7 @@ let replayIdx = -1;
 requestAnimationFrame(frameLoop);
 
 // 개발 중 콘솔에서 상태를 만져 볼 수 있게
-if (import.meta.env.DEV) Object.assign(window, { yumeka: { controller, habitat, recorder } });
+if (import.meta.env.DEV) Object.assign(window, { onna: { controller, habitat, recorder } });
 
 const fmt = (s: number) => {
   const t = Math.max(0, Math.floor(s));
