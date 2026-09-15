@@ -137,7 +137,7 @@ const POSES: Record<"idle" | Exclude<Behavior, "idle">, (c: Ctx) => Pose> = {
     return p;
   },
 
-  rest(c) {
+  sleep(c) {
     const p = base(c);
     Object.assign(p.bones, {
       leftUpperLeg: [-0.9, 0, 0], rightUpperLeg: [-0.6, 0, 0],
@@ -163,7 +163,7 @@ type PoseKey = keyof typeof POSES;
 export class Animator {
   /** 몸 기울기·높이를 적용하는 노드 (hips 높이에 위치) */
   readonly poseRoot = new THREE.Group();
-  private readonly weights: Record<PoseKey, number> = { idle: 1, walk: 0, groom: 0, feed: 0, escape: 0, rest: 0 };
+  private readonly weights: Record<PoseKey, number> = { idle: 1, walk: 0, groom: 0, feed: 0, escape: 0, sleep: 0 };
   private readonly parts: FlyParts;
   private phase = 0;
   private t = 0;
@@ -177,14 +177,15 @@ export class Animator {
     this.poseRoot.position.y = rig.hipsHeight;
   }
 
-  update(dt: number, s: BodyState): void {
+  /** @param mood 0 우울 → 1 행복 (돌봄 상태). 포즈 표정 위에 덧입힌다 */
+  update(dt: number, s: BodyState, mood = 0.5): void {
     this.t += dt;
     const t = this.t;
     this.phase += dt * s.speed * ((Math.PI * 2) / 1.0);
 
     // 목표 가중치
     const walkAmt = Math.min(1, Math.abs(s.speed) / 0.55);
-    const target: Record<PoseKey, number> = { idle: 0, walk: 0, groom: 0, feed: 0, escape: 0, rest: 0 };
+    const target: Record<PoseKey, number> = { idle: 0, walk: 0, groom: 0, feed: 0, escape: 0, sleep: 0 };
     if (s.behavior === "walk" || s.behavior === "idle") {
       target.walk = walkAmt;
       target.idle = 1 - walkAmt;
@@ -192,7 +193,7 @@ export class Animator {
 
     let sum = 0;
     for (const k of Object.keys(target) as PoseKey[]) {
-      const rate = k === "rest" || this.weights.rest > 0.01 ? 1.6 : k === "escape" ? 14 : 6;
+      const rate = k === "sleep" || this.weights.sleep > 0.01 ? 1.6 : k === "escape" ? 14 : 6;
       this.weights[k] += (target[k] - this.weights[k]) * (1 - Math.exp(-dt * rate));
       sum += this.weights[k];
     }
@@ -243,9 +244,13 @@ export class Animator {
     }
     const sinceBlink = t - this.blinkStart;
     const blink = sinceBlink < 0.15 ? Math.sin((sinceBlink / 0.15) * Math.PI) : 0;
+    // 기분 덧입히기 (자는 중에는 편안한 얼굴만)
+    const awake = s.behavior !== "sleep";
+    expr.happy = Math.max(expr.happy ?? 0, awake ? (mood - 0.55) * 1.6 : 0);
+    expr.sad = Math.max(expr.sad ?? 0, awake ? (0.35 - mood) * 2 : 0);
     for (const e of EXPRESSIONS) {
       const v = e === "blink" ? Math.max(expr.blink ?? 0, blink) : expr[e] ?? 0;
-      this.rig.setExpression(e, Math.min(1, v));
+      this.rig.setExpression(e, Math.min(1, Math.max(0, v)));
     }
 
     this.parts.update(t, flap, freq, fold, twitch);
