@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>YUMEKA · 초파리 뇌를 가진 소녀</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪰</text></svg>" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="wordmark">YUMEKA</span>
+        <span class="sub">초파리 전뇌 커넥톰 구동 캐릭터</span>
+      </div>
+      <div class="subject">관찰 대상 <strong>유메카 / YUMEKA</strong></div>
+      <div class="status">
+        <span id="source">FlyWire v783 · LIF</span>
+        <span id="mode-chip" class="chip live">실시간</span>
+      </div>
+    </header>
+
+    <main class="panels">
+      <section class="panel dark" id="neural-panel">
+        <div class="panel-head">
+          <span class="idx">01 · NEURAL FIELD</span>
+          <h2 id="neuron-title">전체 신경계</h2>
+          <button class="ghost small" id="rotate-toggle" aria-pressed="true">자동 회전</button>
+        </div>
+        <div class="viewport" id="neural-view"></div>
+        <div class="panel-foot">
+          <dl class="stats">
+            <div><dt>평균 발화율</dt><dd id="stat-mean">–</dd></div>
+            <div><dt>발화 뉴런</dt><dd id="stat-spiking">–</dd></div>
+            <div><dt>탈분극 뉴런</dt><dd id="stat-active">–</dd></div>
+            <div><dt>시뮬 속도</dt><dd id="stat-speed">–</dd></div>
+          </dl>
+          <div class="meters" id="meters" aria-label="하강·운동 뉴런 발화율, 0–150 Hz"></div>
+          <div class="stim" id="stim"></div>
+          <p class="top-dn" id="top-dn">&nbsp;</p>
+        </div>
+      </section>
+
+      <section class="panel" id="body-panel">
+        <div class="panel-head">
+          <span class="idx">02 · BODY CAM</span>
+          <h2>유메카의 동작</h2>
+        </div>
+        <div class="viewport" id="body-view"></div>
+        <div class="panel-foot body-foot">
+          <div class="behavior">
+            <span class="label">현재 행동</span>
+            <strong id="behavior">–</strong>
+            <span id="cause" class="cause">&nbsp;</span>
+          </div>
+          <dl class="stats">
+            <div><dt>속도</dt><dd id="stat-vel">–</dd></div>
+            <div><dt>회전</dt><dd id="stat-turn">–</dd></div>
+            <div><dt>배고픔</dt><dd><span class="gauge"><i id="g-hunger"></i></span></dd></div>
+            <div><dt>피로</dt><dd><span class="gauge"><i id="g-fatigue"></i></span></dd></div>
+          </dl>
+        </div>
+      </section>
+
+      <section class="panel" id="habitat-panel">
+        <div class="panel-head">
+          <span class="idx">03 · HABITAT MAP</span>
+          <h2>같은 공간의 상공 화면</h2>
+        </div>
+        <div class="viewport map" id="map-view"></div>
+        <div class="panel-foot">
+          <ul class="legend">
+            <li><i style="background: #d0607e"></i>유메카</li>
+            <li><i style="background: #e63950"></i>딸기 (당)</li>
+            <li><i style="background: #7b4fa8"></i>버섯 (쓴맛)</li>
+          </ul>
+          <p class="hint">클릭하면 딸기, Shift+클릭하면 쓴 버섯을 놓습니다.</p>
+          <p class="hint" id="pos">&nbsp;</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="controls">
+      <div class="buttons">
+        <button id="btn-play" class="primary" title="Space">일시정지</button>
+        <button id="btn-food" title="F">딸기 놓기</button>
+        <button id="btn-bitter">쓴 버섯 놓기</button>
+        <button id="btn-threat" title="T">위협 (루밍)</button>
+        <button id="btn-pet" title="P">더듬이 쓰다듬기</button>
+        <button id="btn-light" aria-pressed="true">빛 입력</button>
+        <button id="btn-reset">리셋</button>
+      </div>
+      <div class="timeline">
+        <input type="range" id="timeline" min="0" max="1000" value="1000" step="1" aria-label="타임라인" />
+        <span id="time-label" class="time">00:00 / 200 s</span>
+        <button id="btn-live" class="ghost small" hidden>실시간으로</button>
+      </div>
+    </footer>
+
+    <div class="overlay" id="overlay">
+      <div class="loading">
+        <div class="wordmark">YUMEKA</div>
+        <p id="load-label">커넥톰 불러오는 중…</p>
+        <div class="progress"><i id="load-bar"></i></div>
+        <p class="fine">FlyWire v783 (Dorkenwald·Schlegel et al. 2024) · LIF 모델 Shiu et al. 2024</p>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

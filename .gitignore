@@ -1,0 +1,6 @@
+node_modules/
+dist/
+pipeline/.venv/
+pipeline/raw/
+public/data/
+public/models/*.vrm
