@@ -3,7 +3,11 @@ import { BEHAVIOR_LABEL, Controller } from "./behavior/Controller.ts";
 import { BodyScene } from "./body/BodyScene.ts";
 import { createFallbackRig, loadVrmRig } from "./body/Rig.ts";
 import { NeuralField } from "./brain/NeuralField.ts";
-import { Care } from "./care/Care.ts";
+import { Care, STAGES } from "./care/Care.ts";
+import { burst } from "./fx/Hearts.ts";
+import { Sfx } from "./fx/Sfx.ts";
+import { Director } from "./story/Director.ts";
+import { DialogBox } from "./ui/DialogBox.ts";
 import { MOTOR_GROUPS, SENSORY_GROUPS, type Meta, type MotorGroup, type SensoryGroup } from "./sim/data.ts";
 import { NO_ADAPTATION } from "./sim/lif-engine.ts";
 import type { FromWorker, SimFrame, ToWorker } from "./sim/protocol.ts";
@@ -51,26 +55,97 @@ let simSpeed = 0;
 let lastFrame: SimFrame | undefined;
 const sentStim: Record<SensoryGroup, number> = { sugar: 0, bitter: 0, jo_touch: 0, looming: 0, light: 0 };
 
-// ---------------------------------------------------------------- 말풍선
+// ---------------------------------------------------------------- 연출
+const sfx = new Sfx();
+const body = new BodyScene($("room"));
+
+/** 캐릭터 머리 위 화면 좌표 (없으면 화면 가운데) */
+const anchor = () => body.bubbleAnchor() ?? { x: innerWidth / 2, y: innerHeight / 2 };
+
 let bubbleUntil = 0;
 let nextAmbient = 4;
-function say(text: string | null, seconds = 2.2) {
+function say(text: string | null, seconds = 2.2, silent = false) {
   if (!text) return;
+  if (!silent && $("bubble").textContent !== text) sfx.pop();
   $("bubble").textContent = text;
   $("bubble").hidden = false;
   bubbleUntil = performance.now() / 1000 + seconds;
 }
+
 controller.onEvent = (e) => {
   say(care.on(e, Date.now()));
-  // 먹고 나면 딸기 자리에 과즙 얼룩이 남는다
-  const food = e === "ate" ? habitat.nearest(controller.state, "sweet") : null;
-  if (food) care.addMess("stain", food.food.x + 0.15, food.food.z + 0.1);
+  const at = anchor();
+  switch (e) {
+    case "ate": {
+      sfx.chew();
+      burst(at.x, at.y, 2, ["♪"]);
+      // 먹고 나면 딸기 자리에 과즙 얼룩이 남는다
+      const food = habitat.nearest(controller.state, "sweet");
+      if (food) care.addMess("stain", food.food.x + 0.15, food.food.z + 0.1);
+      break;
+    }
+    case "scared":
+      sfx.jump();
+      burst(at.x, at.y, 3, ["!", "💦"]);
+      break;
+    case "bitter":
+    case "woken":
+      sfx.sad();
+      break;
+    case "wake":
+      director.greetIfNeeded(Date.now());
+      break;
+  }
+};
+
+function cleanUp(id?: number) {
+  const before = care.s.messes.length;
+  say(care.clean(Date.now(), id));
+  if (care.s.messes.length < before) {
+    sfx.sparkle();
+    const at = anchor();
+    burst(at.x, at.y, id === undefined ? 8 : 3, ["✨", "✦"]);
+  }
+}
+
+// ---------------------------------------------------------------- 대화
+const dialog = new DialogBox($("dialog"), {
+  onOpen: () => {
+    document.body.classList.add("talking");
+    controller.talking = true;
+    body.setFocus(true);
+    setPrank(false);
+  },
+  onClose: () => {
+    document.body.classList.remove("talking");
+    controller.talking = false;
+    body.setFocus(false);
+    body.setTalking(false);
+  },
+  onExpr: (expr) => body.setExpression(expr),
+  onTyping: (typing) => body.setTalking(typing),
+  onTick: () => sfx.tick(),
+  onChoice: (choice) => {
+    sfx.choice();
+    // 대화로 오르는 애정은 하루 다섯 번까지만
+    const talks = care.todayStats(Date.now()).talks;
+    care.bump(choice.mood ?? 0, talks <= 5 ? choice.affection ?? 0 : 0);
+    if ((choice.affection ?? 0) > 0 || (choice.mood ?? 0) > 0) {
+      const at = anchor();
+      burst(at.x, at.y, 4);
+    }
+  },
+});
+const director = new Director(care, dialog);
+director.onStageUp = (stage) => {
+  sfx.levelUp();
+  burst(innerWidth / 2, innerHeight * 0.45, 14, ["♥", "💕", "✨"]);
+  $("stage").textContent = `💞 ${STAGES[stage].name}`;
 };
 
 // ---------------------------------------------------------------- 방
-const body = new BodyScene($("room"));
 body.onPet = () => pet();
-body.onCleanMess = (id) => say(care.clean(Date.now(), id));
+body.onCleanMess = (id) => cleanUp(id);
 
 loadVrmRig(`${BASE}models/onna.vrm`)
   .catch((err) => {
@@ -116,7 +191,8 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
         (TIME_SCALE !== 1 ? ` · 시간 ${TIME_SCALE}배속` : "");
       $("overlay").hidden = true;
       ready = true;
-      say(care.s.asleep ? "💤" : care.s.hunger > 0.75 ? "배고파…" : "안녕!");
+      if (care.s.asleep) say("💤", 2, true);
+      else director.greetIfNeeded(Date.now());
       break;
     case "frame":
       onFrame(msg);
@@ -157,9 +233,23 @@ function giveFood(kind: FoodKind) {
 }
 
 function pet() {
-  if (!ready) return;
+  if (!ready || dialog.open) return;
   habitat.pet(worldTime);
-  if (!controller.wakeUp()) say(care.on("petted", Date.now()));
+  if (controller.wakeUp()) return;
+  const line = care.on("petted", Date.now());
+  say(line);
+  if (line !== "그만~") {
+    sfx.pet();
+    const at = anchor();
+    burst(at.x, at.y, 3);
+  }
+}
+
+function talk() {
+  if (!ready || dialog.open) return;
+  if (care.s.asleep) return say("쿨쿨…");
+  if (controller.state.behavior === "escape") return;
+  director.talk(Date.now());
 }
 
 function toggleLights() {
@@ -190,7 +280,17 @@ const setPrank = (open: boolean) => {
 
 $("btn-feed").onclick = () => giveFood("sweet");
 $("btn-pet").onclick = pet;
-$("btn-clean").onclick = () => say(care.clean(Date.now()));
+$("btn-clean").onclick = () => cleanUp();
+$("btn-talk").onclick = talk;
+const updateMute = () => {
+  $("btn-mute").textContent = sfx.muted ? "🔇" : "🔊";
+  $("btn-mute").setAttribute("aria-label", sfx.muted ? "소리 켜기" : "소리 끄기");
+};
+$("btn-mute").onclick = () => {
+  sfx.setMuted(!sfx.muted);
+  updateMute();
+};
+updateMute();
 $("btn-prank").onclick = () => setPrank(prankMenu.hidden !== false);
 $("btn-bitter").onclick = () => {
   setPrank(false);
@@ -231,13 +331,15 @@ $("btn-restart").onclick = () => {
 updateLightButton();
 
 window.addEventListener("keydown", (e) => {
+  if (dialog.open) return;
   if (e.key === "Escape") {
     togglePanel("brain-panel", false);
     togglePanel("diary-panel", false);
     setPrank(false);
   } else if (e.key === "f") giveFood("sweet");
   else if (e.key === "p") pet();
-  else if (e.key === "c") say(care.clean(Date.now()));
+  else if (e.key === "c") cleanUp();
+  else if (e.key === "t") talk();
   else if (e.key === "l") toggleLights();
   else if (e.key === "b") togglePanel("brain-panel");
 });
@@ -271,16 +373,22 @@ function frameLoop(now: number) {
   if (worldDt > 0) {
     controller.update(worldDt, worldTime, habitat, care);
     worldTime += worldDt;
+    // 오늘 기록: 뇌 출력으로 먹거나 손질한 시간
+    const b = controller.state.behavior;
+    if (b === "feed") care.todayStats(Date.now()).feedSec += worldDt;
+    if (b === "groom") care.todayStats(Date.now()).groomSec += worldDt;
     const rates = habitat.sense(controller.state, worldTime, care.s.hunger, care.s.asleep);
     for (const g of SENSORY_GROUPS) sendStim(g, rates[g]);
   }
   body.render(dt, controller.state, habitat.foods, care.s.messes, care.s.lightsOn, care.s.mood);
+  const panelsOpen = !$("brain-panel").hidden || !$("diary-panel").hidden;
+  director.update(Date.now(), ready && !care.s.asleep && !panelsOpen && controller.state.behavior === "walk");
   if (!$("brain-panel").hidden) neural?.render();
 
   // 말풍선: 이벤트 대사가 없으면 가끔 속마음
   const t = now / 1000;
   if (ready && t > bubbleUntil) {
-    if (care.s.asleep) say("💤", 0.2);
+    if (care.s.asleep) say("💤", 0.2, true);
     else if (t > nextAmbient) {
       nextAmbient = t + 7 + Math.random() * 6;
       const s = care.s;
@@ -300,7 +408,7 @@ function frameLoop(now: number) {
 requestAnimationFrame(frameLoop);
 
 // 개발 중 콘솔에서 상태를 만져 볼 수 있게
-if (import.meta.env.DEV) Object.assign(window, { onna: { controller, habitat, care } });
+if (import.meta.env.DEV) Object.assign(window, { onna: { controller, habitat, care, director, dialog } });
 
 // ---------------------------------------------------------------- UI 갱신
 function setGauge(id: string, value: number) {
@@ -318,6 +426,7 @@ function updateUi() {
   setGauge("g-clean", care.cleanliness);
   setGauge("g-love", s.affection);
   $("days").textContent = `함께한 지 ${care.daysTogether(Date.now())}일`;
+  $("stage").textContent = `💞 ${STAGES[Math.min(care.stage, care.s.stageSeen)].name}`;
 
   const state = controller.state;
   const label = BEHAVIOR_LABEL[Controller.displayBehavior(state)];
@@ -360,6 +469,7 @@ function renderDiary() {
   const s = care.s;
   const stats = [
     ["함께한 날", `${care.daysTogether(now)}일`],
+    ["관계", STAGES[Math.min(care.stage, s.stageSeen)].name],
     ["애정", `${Math.round(s.affection * 100)}%`],
     ["기분", `${Math.round(s.mood * 100)}%`],
     ["청결", `${Math.round(care.cleanliness * 100)}%`],

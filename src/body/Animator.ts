@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { Behavior, BodyState } from "../behavior/Controller.ts";
 import { BONES, type BoneName, type ExpressionName, type Rig } from "./Rig.ts";
 import { FlyParts } from "./FlyParts.ts";
+import type { Expr } from "../story/scripts.ts";
 
 type Vec3 = [number, number, number];
 
@@ -156,7 +157,8 @@ const POSES: Record<"idle" | Exclude<Behavior, "idle">, (c: Ctx) => Pose> = {
   },
 };
 
-const EXPRESSIONS: ExpressionName[] = ["aa", "happy", "surprised", "relaxed", "blink", "sad"];
+const EXPRESSIONS: ExpressionName[] = ["aa", "happy", "surprised", "relaxed", "blink", "sad", "angry"];
+const EMOTIONS: ExpressionName[] = ["happy", "surprised", "relaxed", "sad", "angry"];
 type PoseKey = keyof typeof POSES;
 
 /** 행동 상태 → 포즈 블렌딩 → 본 회전·표정·파츠 */
@@ -169,6 +171,10 @@ export class Animator {
   private t = 0;
   private nextBlink = 2;
   private blinkStart = -1;
+  /** 대화 대사의 표정 (없으면 기분·행동으로 정함) */
+  exprOverride: Expr | undefined;
+  /** 대사가 찍히는 동안 입을 움직인다 */
+  talking = false;
 
   constructor(private readonly rig: Rig) {
     this.parts = new FlyParts(rig);
@@ -248,6 +254,10 @@ export class Animator {
     const awake = s.behavior !== "sleep";
     expr.happy = Math.max(expr.happy ?? 0, awake ? (mood - 0.55) * 1.6 : 0);
     expr.sad = Math.max(expr.sad ?? 0, awake ? (0.35 - mood) * 2 : 0);
+    if (this.exprOverride && awake) {
+      for (const e of EMOTIONS) expr[e] = e === this.exprOverride ? 1 : Math.min(expr[e] ?? 0, 0.1);
+    }
+    if (this.talking && awake) expr.aa = Math.max(expr.aa ?? 0, 0.3 + 0.3 * Math.sin(t * 24));
     for (const e of EXPRESSIONS) {
       const v = e === "blink" ? Math.max(expr.blink ?? 0, blink) : expr[e] ?? 0;
       this.rig.setExpression(e, Math.min(1, Math.max(0, v)));

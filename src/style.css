@@ -102,8 +102,9 @@ button {
 .bar { width: 56px; height: 8px; border-radius: 4px; background: var(--accent-soft); overflow: hidden; }
 .bar i { display: block; height: 100%; width: 50%; background: var(--accent); border-radius: 0 4px 4px 0; transition: width 0.4s; }
 .bar i.low { background: var(--low); }
+.hud-buttons { margin-left: auto; display: flex; gap: 8px; }
+.profile b { font-weight: 600; color: var(--accent); }
 .round {
-  margin-left: auto;
   width: 44px;
   height: 44px;
   border-radius: 50%;
@@ -176,6 +177,69 @@ button {
 }
 .menu button { padding: 8px 12px; border-radius: 10px; white-space: nowrap; text-align: left; }
 .menu button:hover { background: var(--accent-soft); }
+
+/* 대화창 */
+.dialog {
+  position: fixed;
+  z-index: 6;
+  left: 50%;
+  bottom: calc(18px + var(--safe-bottom));
+  transform: translateX(-50%);
+  width: min(680px, calc(100vw - 32px));
+  min-height: 132px;
+  padding: 26px 22px 18px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(10px);
+  border: 2px solid #f6c3d0;
+  border-radius: 22px;
+  box-shadow: 0 10px 30px rgba(60, 30, 50, 0.18);
+  cursor: pointer;
+  animation: rise-in 0.25s ease-out;
+}
+@keyframes rise-in { from { transform: translate(-50%, 16px); opacity: 0; } }
+.dialog-name {
+  position: absolute;
+  top: -14px;
+  left: 20px;
+  padding: 3px 14px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  border-radius: 99px;
+  letter-spacing: 0.08em;
+}
+.dialog-text { margin: 0; font-size: 16px; line-height: 1.6; min-height: 3.2em; }
+.dialog-next { position: absolute; right: 18px; bottom: 10px; color: var(--accent); animation: bob 0.8s infinite alternate; }
+@keyframes bob { to { transform: translateY(3px); } }
+.dialog-choices { display: grid; gap: 8px; margin-top: 10px; }
+.dialog-choices:empty { display: none; }
+.dialog-choices button {
+  text-align: left;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+.dialog-choices button:hover, .dialog-choices button:focus-visible { background: #fbd0dc; outline: none; }
+.dialog-choices button::before { content: "♡ "; color: var(--accent); }
+body.talking .dock, body.talking .status, body.talking .bubble { display: none; }
+
+/* 하트·반짝이 파티클 */
+.particle {
+  position: fixed;
+  z-index: 7;
+  pointer-events: none;
+  color: var(--accent);
+  font-size: var(--size, 18px);
+  transform: translate(-50%, -50%);
+  animation: float-up 1.1s ease-out forwards;
+  text-shadow: 0 2px 6px rgba(232, 115, 143, 0.35);
+}
+@keyframes float-up {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+  15% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% - var(--rise, 90px))) scale(0.9); }
+}
 
 /* 서랍 (뇌·일기) */
 .drawer {
@@ -252,7 +316,10 @@ button {
   .gauges .label { display: none; }
   .bar { width: 28px; }
   .round { width: 40px; height: 40px; }
-  .dock > button, .prank > button { min-width: 54px; padding: 6px 4px; font-size: 11px; }
+  .dock { gap: 2px; padding: 6px; }
+  .dock > button, .prank > button { min-width: 46px; padding: 6px 2px; font-size: 11px; }
+  .dock span { font-size: 20px; }
+  .dialog-text { font-size: 15px; }
   .drawer { top: auto; height: 78vh; width: 100vw; border-radius: 20px 20px 0 0; --slide: 0; animation-name: rise; }
   .drawer.diary, .drawer.brain { left: 0; right: 0; border: 0; }
   .viewport { height: 220px; }

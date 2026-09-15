@@ -14,6 +14,26 @@ export interface Mess {
   z: number;
 }
 
+/** 관계 단계. 애정이 min 이상이면 그 단계 */
+export const STAGES = [
+  { name: "낯섦", min: 0 },
+  { name: "친구", min: 0.35 },
+  { name: "호감", min: 0.55 },
+  { name: "두근두근", min: 0.75 },
+  { name: "연인", min: 0.92 },
+] as const;
+
+/** 오늘 하루 기록 (뇌 출력 기반 대화에 쓴다) */
+export interface TodayStats {
+  day: string; // 로컬 날짜 YYYY-MM-DD
+  feedSec: number; // MN9 가 섭식을 일으킨 시간
+  groomSec: number; // 그루밍 DN 이 손질을 일으킨 시간
+  scares: number;
+  pets: number;
+  meals: number;
+  talks: number;
+}
+
 export interface DiaryEntry {
   t: number; // epoch ms
   text: string;
@@ -30,6 +50,13 @@ export interface CareState {
   messes: Mess[];
   /** 다음 먼지가 생길 때까지 남은 게임 시간 (h) */
   dustIn: number;
+  /** 이벤트를 이미 본 가장 높은 관계 단계 */
+  stageSeen: number;
+  /** 마지막으로 시간대 인사를 한 날 */
+  greetedDay: string;
+  today: TodayStats;
+  /** 최근에 한 대화 주제 id (반복 줄이기) */
+  recentTalks: string[];
   bornAt: number;
   lastSeen: number;
   diary: DiaryEntry[];
@@ -54,11 +81,22 @@ const MESS_WEIGHT = 0.18; // 얼룩 하나당 청결도 감소
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
+export function localDay(now: number): string {
+  const d = new Date(now);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function emptyToday(now: number): TodayStats {
+  return { day: localDay(now), feedSec: 0, groomSec: 0, scares: 0, pets: 0, meals: 0, talks: 0 };
+}
+
 export class Care {
   s: CareState;
   /** 시간 배속 (?time=60 이면 1분이 1시간). 시연·테스트용 */
   readonly timeScale: number;
   private petTimes: number[] = [];
+  /** 이번에 열었을 때 닫혀 있던 시간 (게임 시간, h) */
+  awayHours = 0;
 
   private constructor(s: CareState, timeScale: number) {
     this.s = s;
@@ -68,7 +106,9 @@ export class Care {
   static fresh(now: number): CareState {
     return {
       hunger: 0.45, sleepiness: 0.2, mood: 0.6, affection: 0.3,
-      asleep: false, lightsOn: true, messes: [], dustIn: RATE.dustEvery, bornAt: now, lastSeen: now,
+      asleep: false, lightsOn: true, messes: [], dustIn: RATE.dustEvery,
+      stageSeen: 0, greetedDay: "", today: emptyToday(now), recentTalks: [],
+      bornAt: now, lastSeen: now,
       diary: [{ t: now, text: "온나가 방에 왔어요." }],
     };
   }
@@ -89,6 +129,7 @@ export class Care {
 
   private catchUp(now: number): void {
     const hours = Math.min(OFFLINE_CAP_H, ((now - this.s.lastSeen) / 3.6e6) * this.timeScale);
+    this.awayHours = hours;
     if (hours < 1 / 60) return;
     const wasAsleep = this.s.asleep;
     // 1분 단위로 흘린다 (최대 72시간 = 4320 스텝)
@@ -132,6 +173,37 @@ export class Care {
         0.35 * Math.max(0, s.sleepiness - 0.75) - 0.3 * Math.max(0, 0.7 - this.cleanliness),
     );
     s.mood += (target - s.mood) * (1 - Math.exp(-realSec / 120));
+  }
+
+  /** 현재 애정으로 정해지는 관계 단계 (0-4) */
+  get stage(): number {
+    let k = 0;
+    STAGES.forEach((st, i) => {
+      if (this.s.affection >= st.min) k = i;
+    });
+    return k;
+  }
+
+  /** 아직 이벤트를 보지 않은 새 단계가 있으면 그 단계 */
+  pendingStage(): number | null {
+    return this.stage > this.s.stageSeen ? this.s.stageSeen + 1 : null;
+  }
+
+  markStageSeen(stage: number, now: number): void {
+    if (stage <= this.s.stageSeen) return;
+    this.s.stageSeen = stage;
+    this.log(now, `관계가 '${STAGES[stage].name}'(으)로 깊어졌어요 💞`);
+  }
+
+  /** 오늘 기록. 날짜가 바뀌었으면 새로 시작 */
+  todayStats(now: number): TodayStats {
+    if (this.s.today.day !== localDay(now)) this.s.today = emptyToday(now);
+    return this.s.today;
+  }
+
+  bump(mood: number, affection = 0): void {
+    this.s.mood = clamp01(this.s.mood + mood);
+    this.s.affection = clamp01(this.s.affection + affection);
   }
 
   /** 0 엉망 → 1 깨끗 */
@@ -180,10 +252,11 @@ export class Care {
   /** 돌봄 이벤트 반영. 말풍선에 띄울 짧은 대사를 돌려준다 */
   on(event: CareEvent, now: number): string | null {
     const s = this.s;
-    const bump = (mood: number, affection = 0) => {
-      s.mood = clamp01(s.mood + mood);
-      s.affection = clamp01(s.affection + affection);
-    };
+    const bump = (mood: number, affection = 0) => this.bump(mood, affection);
+    const today = this.todayStats(now);
+    if (event === "ate") today.meals++;
+    if (event === "scared") today.scares++;
+    if (event === "petted") today.pets++;
     switch (event) {
       case "ate":
         bump(0.15, s.hunger > 0.2 ? 0.03 : 0.01);

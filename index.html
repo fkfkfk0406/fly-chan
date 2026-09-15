@@ -13,7 +13,7 @@
     <header class="hud">
       <div class="profile">
         <strong>ONNA</strong>
-        <span id="days">함께한 지 1일</span>
+        <span><b id="stage">💞 낯섦</b> · <span id="days">함께한 지 1일</span></span>
       </div>
       <ul class="gauges" aria-label="온나의 상태">
         <li><span class="icon" aria-hidden="true">🍓</span><span class="label">배부름</span><span class="bar"><i id="g-full"></i></span></li>
@@ -22,14 +22,18 @@
         <li><span class="icon" aria-hidden="true">🧼</span><span class="label">청결</span><span class="bar"><i id="g-clean"></i></span></li>
         <li><span class="icon" aria-hidden="true">💗</span><span class="label">애정</span><span class="bar"><i id="g-love"></i></span></li>
       </ul>
-      <button id="btn-diary" class="round" aria-label="일기">📔</button>
+      <div class="hud-buttons">
+        <button id="btn-mute" class="round" aria-label="소리 끄기">🔊</button>
+        <button id="btn-diary" class="round" aria-label="일기">📔</button>
+      </div>
     </header>
 
     <p class="status" id="status" aria-live="polite">&nbsp;</p>
 
     <nav class="dock" aria-label="돌봄">
-      <button id="btn-feed"><span aria-hidden="true">🍓</span>밥 주기</button>
-      <button id="btn-pet"><span aria-hidden="true">✋</span>쓰다듬기</button>
+      <button id="btn-feed"><span aria-hidden="true">🍓</span>밥</button>
+      <button id="btn-talk"><span aria-hidden="true">💬</span>대화</button>
+      <button id="btn-pet"><span aria-hidden="true">✋</span>쓰담</button>
       <button id="btn-clean"><span aria-hidden="true">🧹</span>청소</button>
       <div class="prank">
         <button id="btn-prank" aria-expanded="false"><span aria-hidden="true">😈</span>장난</button>
@@ -39,8 +43,15 @@
         </div>
       </div>
       <button id="btn-light"><span aria-hidden="true">💡</span><em>불 끄기</em></button>
-      <button id="btn-brain" aria-expanded="false"><span aria-hidden="true">🧠</span>뇌 보기</button>
+      <button id="btn-brain" aria-expanded="false"><span aria-hidden="true">🧠</span>뇌</button>
     </nav>
+
+    <section class="dialog" id="dialog" hidden aria-live="polite">
+      <span class="dialog-name">온나</span>
+      <p class="dialog-text"></p>
+      <div class="dialog-choices"></div>
+      <span class="dialog-next" aria-hidden="true">▼</span>
+    </section>
 
     <aside class="drawer brain" id="brain-panel" hidden>
       <div class="drawer-head">

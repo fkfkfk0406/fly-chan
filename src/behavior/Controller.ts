@@ -44,6 +44,8 @@ export class Controller {
   };
   state: BodyState = Controller.initialState();
   onEvent: (e: CareEvent) => void = () => {};
+  /** 대화창이 열려 있으면 제자리에서 사용자 쪽을 본다 */
+  talking = false;
 
   private wanderTurn = 0;
   private pauseUntil = 0;
@@ -185,6 +187,12 @@ export class Controller {
           targetSpeed = -0.5;
           targetTurn = 1.8;
           s.cause = "쓴맛 GRN → 회피 반사";
+          break;
+        }
+
+        if (this.talking) {
+          targetTurn = wrapAngle(Math.atan2(CAMERA_HOME.x - s.x, CAMERA_HOME.z - s.z) - s.heading) * 3;
+          s.cause = "대화 중";
           break;
         }
 

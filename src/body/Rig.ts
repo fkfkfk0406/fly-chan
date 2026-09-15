@@ -9,7 +9,7 @@ export const BONES = [
 ] as const;
 export type BoneName = (typeof BONES)[number];
 
-export type ExpressionName = "aa" | "happy" | "surprised" | "relaxed" | "blink" | "sad";
+export type ExpressionName = "aa" | "happy" | "surprised" | "relaxed" | "blink" | "sad" | "angry";
 
 /**
  * 애니메이터가 조작하는 캐릭터 골격.

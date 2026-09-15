@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { BodyState } from "../behavior/Controller.ts";
 import type { Mess } from "../care/Care.ts";
+import type { Expr } from "../story/scripts.ts";
 import { BED, CAMERA_HOME, ROOM_HALF, type Food } from "../world/Habitat.ts";
 import { Animator } from "./Animator.ts";
 import type { Rig } from "./Rig.ts";
@@ -35,6 +36,9 @@ export class BodyScene {
   private daylight = 1;
   private animator?: Animator;
   private rig?: Rig;
+  private focus = false;
+  private returning = false;
+  private readonly savedOffset = new THREE.Vector3();
 
   constructor(private readonly host: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -190,6 +194,23 @@ export class BodyScene {
     this.raycaster.setFromCamera(ndc, this.camera);
   }
 
+  /** 대화 중 얼굴 클로즈업. 끄면 원래 각도로 돌아간다 */
+  setFocus(on: boolean): void {
+    if (on === this.focus) return;
+    if (on && !this.returning) this.savedOffset.copy(this.camera.position).sub(this.target);
+    this.focus = on;
+    this.returning = !on;
+    this.controls.enabled = !on && !this.returning;
+  }
+
+  setExpression(expr: Expr | undefined): void {
+    if (this.animator) this.animator.exprOverride = expr;
+  }
+
+  setTalking(on: boolean): void {
+    if (this.animator) this.animator.talking = on;
+  }
+
   /** 말풍선을 띄울 화면 좌표 (머리 위) */
   bubbleAnchor(): { x: number; y: number } | null {
     const head = this.rig?.attachNode("head");
@@ -266,14 +287,37 @@ export class BodyScene {
     this.wallMat.emissiveIntensity = 0.45 * k;
     this.moon.visible = k < 0.5;
 
-    // 카메라가 캐릭터를 부드럽게 따라간다 (사용자가 돌린 각도는 유지)
-    const air = state.behavior === "escape" && state.jump < 0.75 ? Math.sin((state.jump / 0.75) * Math.PI) : 0;
-    const next = new THREE.Vector3(state.x * 0.6, 0.7 + state.elev * 0.5 + air * 0.6, state.z * 0.6);
-    const delta = next.sub(this.target).multiplyScalar(1 - Math.exp(-dt * 3));
-    this.target.add(delta);
-    this.camera.position.add(delta);
-    this.controls.target.copy(this.target);
-    this.controls.update();
+    const ease = 1 - Math.exp(-dt * 3);
+    const head = this.rig?.attachNode("head");
+    if (this.focus && head) {
+      // 얼굴 앞, 사용자 쪽에서 살짝 내려다보는 자리로
+      const hp = head.getWorldPosition(new THREE.Vector3());
+      const dir = new THREE.Vector3(CAMERA_HOME.x - hp.x, 0, CAMERA_HOME.z - hp.z).normalize();
+      const eye = hp.clone().addScaledVector(dir, 1.8).add(new THREE.Vector3(0, 0.2, 0));
+      this.target.lerp(hp.add(new THREE.Vector3(0, -0.12, 0)), ease);
+      this.camera.position.lerp(eye, ease);
+      this.camera.lookAt(this.target);
+    } else {
+      // 카메라가 캐릭터를 부드럽게 따라간다 (사용자가 돌린 각도는 유지)
+      const air = state.behavior === "escape" && state.jump < 0.75 ? Math.sin((state.jump / 0.75) * Math.PI) : 0;
+      const follow = new THREE.Vector3(state.x * 0.6, 0.7 + state.elev * 0.5 + air * 0.6, state.z * 0.6);
+      if (this.returning) {
+        this.target.lerp(follow, ease);
+        const goal = follow.clone().add(this.savedOffset);
+        this.camera.position.lerp(goal, ease);
+        this.camera.lookAt(this.target);
+        if (this.camera.position.distanceTo(goal) < 0.05) {
+          this.returning = false;
+          this.controls.enabled = true;
+        }
+      } else {
+        const delta = follow.sub(this.target).multiplyScalar(ease);
+        this.target.add(delta);
+        this.camera.position.add(delta);
+        this.controls.target.copy(this.target);
+        this.controls.update();
+      }
+    }
 
     this.renderer.render(this.scene, this.camera);
   }

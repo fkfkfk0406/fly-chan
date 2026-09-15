@@ -117,3 +117,36 @@ describe("Care 청소", () => {
     expect(dirty.s.mood).toBeLessThan(clean.s.mood - 0.05);
   });
 });
+
+describe("Care 관계 단계", () => {
+  beforeEach(() => store.clear());
+
+  it("애정에 따라 단계가 정해지고, 새 단계는 한 번만 이벤트 대기", () => {
+    const care = Care.load(0);
+    care.s.affection = 0.3;
+    expect(care.stage).toBe(0);
+    expect(care.pendingStage()).toBeNull();
+    care.s.affection = 0.8; // 두근두근(3) 까지 한 번에 올라도 한 단계씩 보여준다
+    expect(care.stage).toBe(3);
+    expect(care.pendingStage()).toBe(1);
+    care.markStageSeen(1, 0);
+    expect(care.pendingStage()).toBe(2);
+    care.markStageSeen(2, 0);
+    care.markStageSeen(3, 0);
+    expect(care.pendingStage()).toBeNull();
+    expect(care.s.diary[0].text).toContain("두근두근");
+    care.s.affection = 0.1; // 애정이 떨어져도 본 이벤트는 다시 안 나온다
+    care.s.affection = 0.8;
+    expect(care.pendingStage()).toBeNull();
+  });
+
+  it("오늘 기록은 날짜가 바뀌면 새로 시작한다", () => {
+    const day1 = new Date(2026, 8, 15, 10).getTime();
+    const care = Care.load(day1);
+    care.on("petted", day1);
+    care.on("ate", day1);
+    expect(care.todayStats(day1)).toMatchObject({ pets: 1, meals: 1 });
+    const day2 = new Date(2026, 8, 16, 9).getTime();
+    expect(care.todayStats(day2)).toMatchObject({ pets: 0, meals: 0 });
+  });
+});
