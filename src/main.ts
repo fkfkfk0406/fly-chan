@@ -4,7 +4,8 @@ import { BodyScene } from "./body/BodyScene.ts";
 import { createFallbackRig, loadVrmRig } from "./body/Rig.ts";
 import { NeuralField } from "./brain/NeuralField.ts";
 import { Care, DAILY_AFFECTION_CAP, STAGES } from "./care/Care.ts";
-import { DEFAULT_NAMES, cleanName } from "./story/personalize.ts";
+import { DEFAULT_NAMES, cleanName, personalize } from "./story/personalize.ts";
+import { mutter } from "./story/scripts.ts";
 import { burst } from "./fx/Hearts.ts";
 import { Sfx } from "./fx/Sfx.ts";
 import { Director } from "./story/Director.ts";
@@ -438,7 +439,7 @@ function frameLoop(now: number) {
     else if (t > nextAmbient) {
       nextAmbient = t + 7 + Math.random() * 6;
       const s = care.s;
-      say(s.hunger > 0.75 ? "배고파…" : s.sleepiness > 0.8 ? "졸려…" : care.cleanliness < 0.5 ? "방이 지저분해…" : s.mood < 0.3 ? "흥…" : s.mood > 0.8 ? "♪" : null);
+      say(s.hunger > 0.75 ? "배고파…" : s.sleepiness > 0.8 ? "졸려…" : care.cleanliness < 0.5 ? "방이 지저분해…" : s.mood < 0.3 ? "흥…" : s.mood > 0.5 && Math.random() < 0.6 ? personalize(mutter(s.stageSeen), { name: charName(), me: s.callMe || DEFAULT_NAMES.me }) : null);
     } else $("bubble").hidden = true;
   }
   const anchor = $("bubble").hidden ? null : body.bubbleAnchor();

@@ -35,7 +35,7 @@ export class Director {
     const care = this.care;
     const today = care.todayStats(now);
     const scene = pickTalk({ stage: care.s.stageSeen, today, cleanliness: care.cleanliness, hunger: care.s.hunger }, care.s.recentTalks);
-    care.s.recentTalks = [scene.id, ...care.s.recentTalks.filter((id) => id !== scene.id)].slice(0, 4);
+    care.s.recentTalks = [scene.id, ...care.s.recentTalks.filter((id) => id !== scene.id)].slice(0, 8);
     today.talks++;
     this.play(scene);
   }

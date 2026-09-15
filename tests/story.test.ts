@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { STAGE_SCENES, TOPICS, greetingScene, pickTalk } from "../src/story/scripts.ts";
+import { STAGE_SCENES, TOPICS, greetingScene, mutter, pickTalk } from "../src/story/scripts.ts";
 import type { TodayStats } from "../src/care/Care.ts";
 import { cleanName, personalize } from "../src/story/personalize.ts";
 
@@ -54,5 +54,34 @@ describe("이름 넣기", () => {
   it("이름 입력은 공백을 정리하고 8자로 자르고, 비면 기본값", () => {
     expect(cleanName("  초파리   공주님입니다요  ", "온나")).toBe("초파리 공주님입");
     expect(cleanName("   ", "온나")).toBe("온나");
+  });
+});
+
+describe("친밀도별 대화", () => {
+  it("관계 단계마다 대화 주제가 3개 이상 있고 혼잣말도 있다", () => {
+    for (let stage = 0; stage <= 4; stage++) {
+      expect(TOPICS.filter((t) => t.minStage === stage).length).toBeGreaterThanOrEqual(3);
+      expect(mutter(stage, () => 0)).toBeTruthy();
+    }
+  });
+
+  it("지금 단계에서 새로 열린 주제를 우선한다", () => {
+    const ctx = { stage: 3, today: today(), cleanliness: 1, hunger: 0.3 };
+    const stage3 = TOPICS.filter((t) => t.minStage === 3).map((t) => t.id);
+    let hits = 0;
+    for (let k = 0; k < 200; k++) if (stage3.includes(pickTalk(ctx, []).id)) hits++;
+    // 전체 주제 중 단계 3 비율보다 확실히 높게 나온다
+    const share = stage3.length / TOPICS.filter((t) => t.minStage <= 3).length;
+    expect(hits / 200).toBeGreaterThan(share + 0.15);
+  });
+
+  it("모든 대사의 이름 자리 표시자가 올바르게 채워진다", () => {
+    const ctx = { stage: 4, today: today({ meals: 1, pets: 1 }), cleanliness: 0.3, hunger: 0.3 };
+    const names = { name: "민트", me: "주인님" };
+    const scenes = [...TOPICS.map((t) => t.build(ctx)), ...Object.values(STAGE_SCENES)];
+    for (const scene of scenes) {
+      const texts = [...scene.lines, ...(scene.choices ?? []).flatMap((c) => c.reply)].map((l) => personalize(l.text, names));
+      for (const text of texts) expect(text).not.toMatch(/[{}]/);
+    }
   });
 });
