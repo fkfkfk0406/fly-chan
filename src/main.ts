@@ -5,12 +5,17 @@ import { createFallbackRig, loadVrmRig } from "./body/Rig.ts";
 import { NeuralField } from "./brain/NeuralField.ts";
 import { Recorder } from "./replay/Recorder.ts";
 import { MOTOR_GROUPS, SENSORY_GROUPS, type Meta, type MotorGroup, type SensoryGroup } from "./sim/data.ts";
+import { NO_ADAPTATION } from "./sim/lif-engine.ts";
 import type { FromWorker, SimFrame, ToWorker } from "./sim/protocol.ts";
 import { Habitat, type FoodKind } from "./world/Habitat.ts";
 import { HabitatMap } from "./world/HabitatMap.ts";
 
+const params = new URLSearchParams(location.search);
 // 적분 간격. ?dt=0.25 처럼 바꿀 수 있다 (작을수록 정확하지만 느림)
-const DT_MS = Number(new URLSearchParams(location.search).get("dt")) || 0.5;
+const DT_MS = Number(params.get("dt")) || 0.5;
+// 발화 빈도 적응 (원 모델에 없음). ?adapt=300:1 → τw 300 ms, 발화당 1 mV. 기본은 끔
+const [TAU_W, B_ADAPT] = (params.get("adapt") ?? "").split(":").map(Number);
+const ADAPTATION = TAU_W > 0 && B_ADAPT > 0 ? { tauW: TAU_W, b: B_ADAPT } : NO_ADAPTATION;
 const BASE = import.meta.env.BASE_URL;
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -88,7 +93,7 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
     case "ready": {
       meta = msg.meta;
       $("neuron-title").textContent = `${meta.neurons.toLocaleString()}개 전체 신경계`;
-      $("source").textContent = `FlyWire v783 · 시냅스 ${(meta.synapses / 1e6).toFixed(1)}M · LIF dt ${DT_MS} ms`;
+      $("source").textContent = `FlyWire v783 · 시냅스 ${(meta.synapses / 1e6).toFixed(1)}M · LIF dt ${DT_MS} ms${ADAPTATION.b ? ` · 적응 ${ADAPTATION.tauW} ms/${ADAPTATION.b} mV` : ""}`;
       loadNeuralField(meta).then(() => {
         $("overlay").hidden = true;
         ready = true;
@@ -107,7 +112,7 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
     }
   }
 };
-send({ type: "init", dt: DT_MS });
+send({ type: "init", dt: DT_MS, adaptation: ADAPTATION });
 
 async function loadNeuralField(m: Meta) {
   const [pos, cls] = await Promise.all([

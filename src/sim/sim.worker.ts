@@ -1,4 +1,4 @@
-import { LifEngine } from "./lif-engine.ts";
+import { LifEngine, type Adaptation } from "./lif-engine.ts";
 import {
   CONNECTOME_FILES, MOTOR_GROUPS, parseConnectome, type Groups, type Meta, type MotorGroup,
 } from "./data.ts";
@@ -50,7 +50,7 @@ async function fetchBuffer(name: string, loaded: { bytes: number; total: number 
   return out.buffer;
 }
 
-async function init(dt: number) {
+async function init(dt: number, adaptation: Adaptation) {
   const base = `${import.meta.env.BASE_URL}data/`;
   const [meta, groupJson, labelJson] = await Promise.all([
     fetch(`${base}meta.json`).then((r) => r.json() as Promise<Meta>),
@@ -64,7 +64,7 @@ async function init(dt: number) {
   const buffers: ArrayBuffer[] = [];
   for (const f of CONNECTOME_FILES) buffers.push(await fetchBuffer(f, loaded));
 
-  engine = new LifEngine(parseConnectome(meta, buffers), meta.lif, dt, (Math.random() * 2 ** 31) | 0);
+  engine = new LifEngine(parseConnectome(meta, buffers), meta.lif, dt, (Math.random() * 2 ** 31) | 0, adaptation);
   trace = new Float32Array(meta.neurons);
   const groupSizes = Object.fromEntries(Object.entries(groups).map(([k, v]) => [k, v.length]));
   post({ type: "ready", meta, groupSizes });
@@ -152,7 +152,7 @@ scope.onmessage = (e) => {
   try {
     switch (msg.type) {
       case "init":
-        init(msg.dt).catch((err) => post({ type: "error", message: String(err?.message ?? err) }));
+        init(msg.dt, msg.adaptation).catch((err) => post({ type: "error", message: String(err?.message ?? err) }));
         break;
       case "stim":
         if (!engine) break;

@@ -62,8 +62,9 @@ def build_groups(ann: pd.DataFrame, index_of: dict) -> dict:
         return sorted(index_of[i] for i in ids if i in index_of)
 
     turn = ct.isin(["DNa01", "DNa02"])
-    # 후각(ORN) 입력은 넣지 않는다: 10 Hz 자극만으로도 약 10만 뉴런이 자극을 끊은 뒤에도
-    # 계속 발화하는 폭주 상태에 빠진다 (적응·억제 균형이 없는 순수 LIF 의 한계, scripts/persist.ts)
+    # 후각(ORN): 적응 없는 LIF 에서는 10 Hz 자극만으로도 약 10만 뉴런이 자극을 끊은 뒤에도
+    # 계속 발화하는 폭주 상태에 빠진다 (scripts/persist.ts). 식초 계열 사구체만 실험용으로 내보낸다.
+    food_orn = ct.isin(["ORN_DM1", "ORN_VA2", "ORN_DM4"])
     return {
         # 감각 입력
         "sugar": pick_ids(SUGAR_IDS),
@@ -71,6 +72,8 @@ def build_groups(ann: pd.DataFrame, index_of: dict) -> dict:
         "jo_touch": pick(sub == "grooming"),  # JO-F: 더듬이 접촉
         "looming": pick(ct == "LPLC2"),
         "light": pick(ct.isin(["R7", "R8"])),
+        "odor_left": pick(food_orn & (side == "left")),
+        "odor_right": pick(food_orn & (side == "right")),
         # 운동 출력
         "forward": pick(ct == "DNp09"),  # P9
         "backward": pick(ct == "MDN"),  # moonwalker

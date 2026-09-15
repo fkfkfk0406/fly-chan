@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LifEngine, type Connectome, type LifParams } from "../src/sim/lif-engine.ts";
+import { LifEngine, type Adaptation, type Connectome, type LifParams } from "../src/sim/lif-engine.ts";
 import { hasData, loadAll } from "../scripts/node-data.ts";
 import type { GroupName } from "../src/sim/data.ts";
 
@@ -43,6 +43,43 @@ describe("LifEngine (합성 네트워크)", () => {
     expect(e.spikeCount[0]).toBe(1);
     e.run(1);
     expect(e.spikeCount[0]).toBe(2);
+  });
+
+  // 0 번(Poisson 400 Hz) → 1 번을 계속 흥분시킨다
+  const driven: Connectome = {
+    n: 2,
+    offsets: Uint32Array.from([0, 1, 1]),
+    targets: Uint32Array.from([1]),
+    weights: Int16Array.from([30]),
+  };
+  const rateTrend = (adapt?: Adaptation) => {
+    const e = new LifEngine(driven, PARAMS, 0.1, 9, adapt);
+    e.setInput("drive", [0], 400);
+    e.run(5000);
+    const early = e.spikeCount[1];
+    e.clearSpikeCounts();
+    e.run(20000);
+    e.clearSpikeCounts();
+    e.run(5000);
+    return { early, late: e.spikeCount[1] };
+  };
+
+  it("적응이 없으면 지속 자극에도 발화율이 유지된다", () => {
+    const { early, late } = rateTrend();
+    expect(early).toBeGreaterThan(5);
+    expect(late).toBeGreaterThan(early * 0.7);
+  });
+
+  it("적응이 있으면 지속 자극에서 발화율이 떨어지고, 휴지 판정에 적응 전류가 포함된다", () => {
+    const { early, late } = rateTrend({ tauW: 300, b: 1 });
+    expect(late).toBeLessThan(early * 0.7);
+
+    const e = new LifEngine(driven, PARAMS, 0.1, 9, { tauW: 300, b: 1 });
+    e.inject(1, 100);
+    e.run(1);
+    e.run(100); // u, g 는 거의 0 이 되지만 w 는 아직 남아 있다
+    expect(e.w[1]).toBeGreaterThan(0.5);
+    expect(e.activeNeurons).toBe(1);
   });
 });
 

@@ -2,6 +2,10 @@
 //   dv/dt = (v0 - v + g) / tauM,  dg/dt = -g / tauSyn   (불응기 동안 정지)
 //   발화: v > vTh → v = vReset, g = 0, 지연 tDelay 뒤 post 뉴런 g += w
 // 대부분의 뉴런은 휴지 상태이므로, 휴지에서 벗어난 뉴런만 "활성 목록"으로 적분한다.
+//
+// 원 모델에 없는 확장: 발화 빈도 적응(spike-frequency adaptation)
+//   dv/dt 에 −w/τm 항 추가, dw/dt = −w/τw, 발화 시 w += b
+//   계속 발화하는 뉴런이 스스로 흥분도를 낮춘다. b = 0 이면 Shiu et al. 원 모델과 같다.
 
 export interface Connectome {
   n: number;
@@ -24,6 +28,15 @@ export interface LifParams {
 
 const REST_EPS = 0.02; // mV, 이보다 작으면 휴지로 간주
 
+export interface Adaptation {
+  /** 적응 전류 감쇠 시간 상수 (ms) */
+  tauW: number;
+  /** 발화 1회당 적응 전류 증가량 (mV). 0 = 적응 없음 */
+  b: number;
+}
+
+export const NO_ADAPTATION: Adaptation = { tauW: 1, b: 0 };
+
 export class LifEngine {
   readonly n: number;
   readonly dt: number;
@@ -32,6 +45,8 @@ export class LifEngine {
   /** v - v0 (mV) */
   readonly u: Float32Array;
   readonly g: Float32Array;
+  /** 적응 전류 (mV) */
+  readonly w: Float32Array;
   /** 마지막 스냅샷 이후 뉴런별 발화 수 */
   readonly spikeCount: Uint16Array;
   totalSpikes = 0;
@@ -46,6 +61,9 @@ export class LifEngine {
   private readonly cvv: number;
   private readonly cvg: number;
   private readonly cgg: number;
+  private readonly cvw: number;
+  private readonly cww: number;
+  private readonly bAdapt: number;
   private readonly uTh: number;
   private readonly uReset: number;
   private readonly wSyn: number;
@@ -59,13 +77,14 @@ export class LifEngine {
   private readonly inputs = new Map<string, { idx: Uint32Array; rate: number }>();
   private rng: number;
 
-  constructor(conn: Connectome, p: LifParams, dt = 0.1, seed = 1) {
+  constructor(conn: Connectome, p: LifParams, dt = 0.1, seed = 1, adapt: Adaptation = NO_ADAPTATION) {
     this.conn = conn;
     this.n = conn.n;
     this.dt = dt;
     const n = conn.n;
     this.u = new Float32Array(n);
     this.g = new Float32Array(n);
+    this.w = new Float32Array(n);
     this.spikeCount = new Uint16Array(n);
     this.refUntil = new Int32Array(n);
     this.noRefractory = new Uint8Array(n);
@@ -78,6 +97,11 @@ export class LifEngine {
     this.cvv = em;
     this.cvg = (p.tauSyn / (p.tauSyn - p.tauM)) * (es - em);
     this.cgg = es;
+    // w 도 g 와 같은 형태의 지수 감쇠 입력(부호만 반대)
+    const ew = Math.exp(-dt / adapt.tauW);
+    this.cvw = adapt.tauW === p.tauM ? (dt / p.tauM) * em : (adapt.tauW / (adapt.tauW - p.tauM)) * (ew - em);
+    this.cww = ew;
+    this.bAdapt = adapt.b;
     this.uTh = p.vTh - p.v0;
     this.uReset = p.vReset - p.v0;
     this.wSyn = p.wSyn;
@@ -126,6 +150,7 @@ export class LifEngine {
   reset(): void {
     this.u.fill(0);
     this.g.fill(0);
+    this.w.fill(0);
     this.refUntil.fill(0);
     this.isActive.fill(0);
     this.spikeCount.fill(0);
@@ -163,7 +188,7 @@ export class LifEngine {
 
   private tick(): void {
     const t = ++this.step;
-    const { u, g, refUntil, active, isActive, cvv, cvg, cgg, uTh, uReset } = this;
+    const { u, g, w, refUntil, active, isActive, cvv, cvg, cgg, cvw, cww, bAdapt, uTh, uReset } = this;
     // 슬롯 수 = 지연 스텝 + 1 이므로 이번 스텝의 쓰기 슬롯과 읽기 슬롯이 겹치지 않는다
     const slotCount = this.delaySlots.length;
     const sendSlot = (t + slotCount - 1) % slotCount;
@@ -174,12 +199,15 @@ export class LifEngine {
       if (refUntil[i] >= t) continue; // 불응기: 상태 정지
       const ui = u[i];
       const gi = g[i];
-      let nu = ui * cvv + gi * cvg;
+      const wi = w[i];
+      let nu = ui * cvv + gi * cvg - wi * cvw;
       const ng = gi * cgg;
+      const nw = wi * cww;
       if (nu > uTh) {
         nu = uReset;
         g[i] = 0;
         u[i] = nu;
+        w[i] = nw + bAdapt;
         if (!this.noRefractory[i]) refUntil[i] = t + this.refSteps;
         if (this.spikeCount[i] < 65535) this.spikeCount[i]++;
         this.totalSpikes++;
@@ -188,9 +216,11 @@ export class LifEngine {
       }
       u[i] = nu;
       g[i] = ng;
-      if (nu < REST_EPS && nu > -REST_EPS && ng < REST_EPS && ng > -REST_EPS) {
+      w[i] = nw;
+      if (nu < REST_EPS && nu > -REST_EPS && ng < REST_EPS && ng > -REST_EPS && nw < REST_EPS) {
         u[i] = 0;
         g[i] = 0;
+        w[i] = 0;
         isActive[i] = 0;
         active[j] = active[--this.activeCount];
       }
