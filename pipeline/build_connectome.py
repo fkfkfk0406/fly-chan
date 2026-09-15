@@ -36,6 +36,26 @@ SUGAR_IDS = [
 ]
 MN9_IDS = [720575940660219265]  # Shiu et al. 섭식 운동뉴런 MN9
 
+# Shiu et al. figures.ipynb (Fig. 3·4) 의 물 감지 GRN (ppk28 계열). sugar 와 같은 반구.
+# 모두 v783 에 존재: FlyWire 주석상 LB3 17개 + LB2d 1개 ("sugar/water" 로 뭉뚱그려져 있음).
+# 출력 연결 코사인 유사도로 봐도 sugar 중심보다 water 중심에 가깝다.
+WATER_IDS = [
+    720575940612950568, 720575940631898285, 720575940606002609, 720575940612579053,
+    720575940622902535, 720575940616177458, 720575940660292225, 720575940622486922,
+    720575940613786774, 720575940629852866, 720575940625861168, 720575940613996959,
+    720575940617857694, 720575940644965399, 720575940625203504, 720575940630553415,
+    720575940635172191, 720575940634796536,
+]
+# Shiu et al. figures.ipynb 의 Ir94e GRN (저농도 소금·섭식 억제성). sugar 와 같은 반구.
+# FlyWire 주석상 LB1e 11개(주석은 "bitter"!) + LB2a-b 4개 + LB2c 3개 ("low-salt").
+IR94E_IDS = [
+    720575940614211295, 720575940638218173, 720575940628832256, 720575940626016017,
+    720575940621375231, 720575940612920386, 720575940614273292, 720575940628198503,
+    720575940626241636, 720575940619387814, 720575940624604560, 720575940615274425,
+    720575940610683315, 720575940627265265, 720575940624079544, 720575940629211607,
+    720575940615089369, 720575940631082124,
+]
+
 # Shiu et al. model.py default_params
 LIF_PARAMS = {
     "v0": -52.0, "vReset": -52.0, "vTh": -45.0,  # mV
@@ -74,6 +94,23 @@ def build_groups(ann: pd.DataFrame, index_of: dict) -> dict:
         "light": pick(ct.isin(["R7", "R8"])),
         "odor_left": pick(food_orn & (side == "left")),
         "odor_right": pick(food_orn & (side == "right")),
+        # --- 간식 후보 미각 그룹 (scripts/taste_probe.ts 로 반응 확인)
+        # 물: Shiu et al. 물 GRN ID (신뢰도 높음)
+        "water": pick_ids(WATER_IDS),
+        # Ir94e: Shiu et al. Ir94e GRN ID (신뢰도 높음, 단 맛 자체는 저염/아미노산 등 논란)
+        "ir94e": pick_ids(IR94E_IDS),
+        # 저염: FlyWire 주석 cell_sub_class == "low-salt" 양쪽 (LB2a-b, LB2c, LB4a).
+        # LB4a 는 수용체 대응이 확인되지 않음 (신뢰도 중간)
+        "low_salt": pick(sub == "low-salt"),
+        # 고염: LB2d 중 글루탐산성 GRN. 글루탐산성 ppk23/Ir7c 고염 GRN 과 형태·전달물질이 맞음 (신뢰도 낮음~중간)
+        "high_salt": pick((ct == "LB2d") & (ann.top_nt == "glutamate")),
+        # 맛 돌기(taste peg) GRN: 탄산(CO2)·지방산(Ir56d) 감지로 알려짐 (신뢰도 중간)
+        "taste_peg": pick(ct.isin(["claw_tpGRN", "dorsal_tpGRN"])),
+        # 인두 GRN: PhG1 ≈ Gr64e+ (당), PhG3·4 ≈ ppk28+ (물) 로 대응된다는 보고 (신뢰도 낮음~중간)
+        "pharynx_sugar": pick(ct.isin(["PhG1a", "PhG1b", "PhG1c"])),
+        "pharynx_water": pick(ct.isin(["PhG3", "PhG4"])),
+        # 다리(VNC) 미각 상행 뉴런 SA_VTV: 감각 종류 불명 (탐색용)
+        "leg_taste": pick((cls == "gustatory") & (sub == "SA_VTV_pro_meso_meta")),
         # 운동 출력
         "forward": pick(ct == "DNp09"),  # P9
         "backward": pick(ct == "MDN"),  # moonwalker
