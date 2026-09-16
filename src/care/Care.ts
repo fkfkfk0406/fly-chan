@@ -1,7 +1,7 @@
 // 다마고치식 돌봄 상태. 뇌 시뮬레이션 밖의 "게임 상태"다.
 // 배고픔만 뇌에 닿는다(배고플수록 당 GRN 입력이 세짐, Habitat.sense). 나머지는 행동 선택·표정·말풍선에 쓴다.
 import { hasBatchim } from "../story/personalize.ts";
-import { ROOM_HALF, insideBed } from "../world/Habitat.ts";
+import { ROOM_HALF, SNACKS, insideBed, type FoodKind } from "../world/Habitat.ts";
 
 export type CareEvent =
   | "ate" | "full" | "bitter" | "scared" | "petted" | "sleep" | "wake" | "woken";
@@ -72,6 +72,8 @@ export interface CareState {
   /** 마지막으로 시간대 인사를 한 날 */
   greetedDay: string;
   today: TodayStats;
+  /** 간식별로 관찰한 MN9 최고 발화율 (Hz). 뇌 반응으로 알아낸 취향 */
+  tastes: Partial<Record<FoodKind, number>>;
   /** 최근에 한 대화 주제 id (반복 줄이기) */
   recentTalks: string[];
   bornAt: number;
@@ -130,7 +132,7 @@ export class Care {
       asleep: false, lightsOn: true, messes: [], dustIn: RATE.dustEvery,
       name: "", callMe: "", introDone: false,
       stageSeen: 0, gameHours: 0, gainDay: 0, gainToday: 0,
-      greetedDay: "", today: emptyToday(now), recentTalks: [],
+      greetedDay: "", today: emptyToday(now), recentTalks: [], tastes: {},
       bornAt: now, lastSeen: now,
       diary: [],
     };
@@ -312,9 +314,16 @@ export class Care {
     return "고마워~";
   }
 
-  /** 딸기를 amount 개(0-1) 만큼 먹음. 딸기 하나 = 배고픔 0.35 */
-  eat(amount: number): void {
-    this.s.hunger = clamp01(this.s.hunger - amount * 0.35);
+  /** 간식을 amount 개(0-1) 만큼 먹음. 채워지는 양은 간식마다 다르다 */
+  eat(amount: number, kind: FoodKind): void {
+    this.s.hunger = clamp01(this.s.hunger - amount * SNACKS[kind].fills);
+  }
+
+  /** 먹는 동안 관찰한 MN9 발화율을 간식별 최고치로 기록한다 (뇌가 알려 주는 취향) */
+  noteTaste(kind: FoodKind, mn9Hz: number): void {
+    const best = this.s.tastes[kind] ?? 0;
+    if (mn9Hz > best) this.s.tastes[kind] = mn9Hz;
+    else if (this.s.tastes[kind] === undefined) this.s.tastes[kind] = 0;
   }
 
   /** 돌봄 이벤트 반영. 말풍선에 띄울 짧은 대사를 돌려준다 */
@@ -326,9 +335,8 @@ export class Care {
     if (event === "petted") today.pets++;
     switch (event) {
       case "ate":
-        // 배고플 때 준 밥이어야 마음이 움직인다
+        // 배고플 때 준 밥이어야 마음이 움직인다. 무엇을 먹었는지는 부르는 쪽이 일기에 남긴다
         this.bump(0.15, s.hunger > 0.5 ? 0.012 : 0);
-        this.log(now, "딸기를 먹었어요.");
         return "냠냠";
       case "full":
         return "배불러~";

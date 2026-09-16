@@ -31,7 +31,15 @@
     <p class="status" id="status" aria-live="polite">&nbsp;</p>
 
     <nav class="dock" aria-label="돌봄">
-      <button id="btn-feed"><span aria-hidden="true">🍓</span>밥</button>
+      <div class="prank">
+        <button id="btn-feed" aria-expanded="false"><span aria-hidden="true">🍓</span>간식</button>
+        <div class="menu" id="snack-menu" hidden>
+          <button data-snack="sweet">🍓 딸기</button>
+          <button data-snack="honey">🍯 꿀</button>
+          <button data-snack="water">💧 물</button>
+          <button data-snack="salty">🥨 짠 과자</button>
+        </div>
+      </div>
       <button id="btn-talk"><span aria-hidden="true">💬</span>대화</button>
       <button id="btn-pet"><span aria-hidden="true">✋</span>쓰담</button>
       <button id="btn-clean"><span aria-hidden="true">🧹</span>청소</button>

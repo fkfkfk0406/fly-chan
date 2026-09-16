@@ -1,6 +1,29 @@
 import type { SensoryGroup } from "../sim/data.ts";
 
-export type FoodKind = "sweet" | "bitter";
+export type FoodKind = "sweet" | "honey" | "water" | "salty" | "bitter";
+
+/**
+ * 간식마다 자극하는 미각 뉴런이 다르다 (scripts/taste_probe.ts 로 확인한 반응).
+ * water 는 100 Hz 에서 반응이 없어 200 Hz, ir94e 는 200 Hz 에서 폭주해 100 Hz 로 제한한다.
+ */
+export const SNACKS: Record<FoodKind, {
+  label: string;
+  emoji: string;
+  group: SensoryGroup;
+  rate: number;
+  /** 배고픔을 얼마나 채우는지 (하나를 다 먹었을 때) */
+  fills: number;
+  /** 배고플수록 더 민감하게 느끼는 맛인지 */
+  byHunger: boolean;
+}> = {
+  sweet: { label: "딸기", emoji: "🍓", group: "sugar", rate: 160, fills: 0.35, byHunger: true },
+  honey: { label: "꿀", emoji: "🍯", group: "pharynx_sugar", rate: 150, fills: 0.3, byHunger: true },
+  water: { label: "물", emoji: "💧", group: "water", rate: 200, fills: 0.1, byHunger: false },
+  salty: { label: "짠 과자", emoji: "🥨", group: "ir94e", rate: 100, fills: 0.05, byHunger: false },
+  bitter: { label: "쓴 버섯", emoji: "🍄", group: "bitter", rate: 160, fills: 0, byHunger: false },
+};
+/** 굳이 찾아가서 먹는 간식 (쓴 버섯·짠 과자는 스스로 찾지 않는다) */
+export const LIKED_SNACKS: FoodKind[] = ["sweet", "honey", "water"];
 
 export interface Food {
   id: number;
@@ -69,6 +92,16 @@ export class Habitat {
     return best;
   }
 
+  /** 주어진 종류들 중 가장 가까운 것 */
+  nearestOf(pose: Pose, kinds: readonly FoodKind[]): { food: Food; dist: number } | null {
+    let best: { food: Food; dist: number } | null = null;
+    for (const kind of kinds) {
+      const n = this.nearest(pose, kind);
+      if (n && (!best || n.dist < best.dist)) best = n;
+    }
+    return best;
+  }
+
   threat(now: number): void {
     this.threatUntil = now + 0.35;
   }
@@ -81,30 +114,47 @@ export class Habitat {
     return ROOM_HALF - Math.max(Math.abs(pose.x), Math.abs(pose.z));
   }
 
+  /** 입에 닿은 정도 (MOUTH_REACH 안에서 1, 바깥 0.2 m 에 걸쳐 0) */
+  contact(pose: Pose, kind: FoodKind): number {
+    const n = this.nearest(pose, kind);
+    return n ? clamp((MOUTH_REACH + 0.2 - n.dist) / 0.2, 0, 1) : 0;
+  }
+
+  /** 지금 입에 닿아 맛보고 있는 간식 (가장 가까운 하나) */
+  tasting(pose: Pose): FoodKind | null {
+    const n = this.nearestOf(pose, Object.keys(SNACKS) as FoodKind[]);
+    return n && n.dist <= MOUTH_REACH + 0.2 ? n.food.kind : null;
+  }
+
   /** 현재 상황에서 감각 그룹별 Poisson 발화율 (Hz) */
   sense(pose: Pose, now: number, hunger: number, asleep: boolean): Record<SensoryGroup, number> {
-    const contact = (kind: FoodKind) => {
-      const n = asleep ? null : this.nearest(pose, kind);
-      // MOUTH_REACH 안에서 1, 바깥 0.2 m 에 걸쳐 0 으로
-      return n ? clamp((MOUTH_REACH + 0.2 - n.dist) / 0.2, 0, 1) : 0;
-    };
     const wall = this.wallDistance(pose);
     if (!asleep && wall < WALL_TOUCH && this.wallArmed) {
       this.wallTouchUntil = now + WALL_TOUCH_SEC;
       this.wallArmed = false;
     } else if (wall > WALL_REARM) this.wallArmed = true;
-    return {
-      // 배고플수록 당에 민감 (포만이면 MN9 가 거의 반응하지 않는다)
-      sugar: contact("sweet") * 160 * (0.25 + 0.75 * hunger),
-      bitter: contact("bitter") * 160,
+
+    const rates: Record<SensoryGroup, number> = {
+      sugar: 0, bitter: 0, water: 0, pharynx_sugar: 0, ir94e: 0,
       jo_touch: now < this.petUntil ? 160 : now < this.wallTouchUntil ? 140 : 0,
       looming: now < this.threatUntil ? 220 : 0,
       // 눈을 감고 있거나 불이 꺼져 있으면 광수용체 입력 없음
       light: this.lightsOn && !asleep ? 8 : 0,
     };
+    if (asleep) return rates;
+    // 입에 닿은 간식 중 가장 가까운 하나만 맛본다.
+    // 두 가지 맛(특히 Ir94e + 쓴맛)을 동시에 넣으면 전뇌가 폭주한다 (scripts/snack-safety.ts)
+    const tasted = this.nearestOf(pose, Object.keys(SNACKS) as FoodKind[]);
+    const contact = tasted ? clamp((MOUTH_REACH + 0.2 - tasted.dist) / 0.2, 0, 1) : 0;
+    if (tasted && contact > 0) {
+      const snack = SNACKS[tasted.food.kind];
+      // 배고플수록 당에 민감 (포만이면 MN9 가 거의 반응하지 않는다)
+      const scale = snack.byHunger ? 0.25 + 0.75 * hunger : 1;
+      rates[snack.group] = contact * snack.rate * scale;
+    }
+    return rates;
   }
 
-  /** 한 입 먹는다. 먹은 양(0-1)을 돌려주고, 다 먹으면 딸기를 없앤다 */
   eat(food: Food, dt: number): number {
     const bite = Math.min(food.amount, dt / EAT_SECONDS);
     food.amount -= bite;

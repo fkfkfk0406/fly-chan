@@ -5,7 +5,8 @@
 import type { Care, CareEvent } from "../care/Care.ts";
 import type { MotorGroup } from "../sim/data.ts";
 import {
-  BED, BED_SIDE, CAMERA_HOME, MOUTH_REACH, ROOM_HALF, clamp, insideBed, type Habitat, type Pose,
+  BED, BED_SIDE, CAMERA_HOME, LIKED_SNACKS, MOUTH_REACH, ROOM_HALF, SNACKS, clamp, insideBed,
+  type FoodKind, type Habitat, type Pose,
 } from "../world/Habitat.ts";
 
 export type Behavior = "idle" | "walk" | "groom" | "feed" | "escape" | "sleep";
@@ -57,8 +58,9 @@ export class Controller {
   private tastingBitter = false;
   private atFoodSince = -1;
   private refusedFood = -1;
-  /** 지금 먹고 있는 딸기 id */
+  /** 지금 먹고 있는 간식 */
   private eatingFood = -1;
+  eatingKind: FoodKind | null = null;
 
   static initialState(): BodyState {
     return {
@@ -116,6 +118,7 @@ export class Controller {
         const food = habitat.foods.find((f) => f.id === this.eatingFood);
         if (food && food.amount < 0.7) habitat.remove(food.id);
         this.eatingFood = -1;
+        this.eatingKind = null;
       }
       if (s.behavior === "sleep") {
         if (next === "escape") this.onEvent("woken");
@@ -126,7 +129,11 @@ export class Controller {
         this.escapeDir = Math.random() < 0.5 ? -1 : 1;
         this.onEvent("scared");
       }
-      if (next === "feed") this.onEvent("ate");
+      if (next === "feed") {
+        // 무엇을 먹기 시작했는지 먼저 정하고 알린다 (일기·말풍선이 간식 이름을 쓴다)
+        this.eatingKind = habitat.nearestOf(s, Object.keys(SNACKS) as FoodKind[])?.food.kind ?? null;
+        this.onEvent("ate");
+      }
       s.behavior = next;
       s.behaviorTime = 0;
     }
@@ -143,7 +150,8 @@ export class Controller {
       targetSpeed = dist > stopAt ? speed : 0;
       return dist;
     };
-    const sweet = habitat.nearest(s, "sweet");
+    const meal = habitat.nearestOf(s, LIKED_SNACKS); // 스스로 찾아가서 먹는 간식
+    const mouth = habitat.nearestOf(s, Object.keys(SNACKS) as FoodKind[]); // 입에 닿은 간식
     const bitter = habitat.nearest(s, "bitter");
 
     switch (s.behavior) {
@@ -155,11 +163,13 @@ export class Controller {
         break;
       }
       case "feed": {
-        if (sweet && sweet.dist < MOUTH_REACH + 0.2) {
-          this.eatingFood = sweet.food.id;
-          care.eat(habitat.eat(sweet.food, dt));
+        if (mouth && mouth.dist < MOUTH_REACH + 0.2) {
+          this.eatingFood = mouth.food.id;
+          this.eatingKind = mouth.food.kind;
+          care.eat(habitat.eat(mouth.food, dt), mouth.food.kind);
         }
-        s.cause = `MN9 ${r.feed.toFixed(0)} Hz ← 당 GRN`;
+        const snack = this.eatingKind ? SNACKS[this.eatingKind] : null;
+        s.cause = `MN9 ${r.feed.toFixed(0)} Hz ← ${snack ? snack.label : "당"} 맛 뉴런`;
         break;
       }
       case "groom":
@@ -207,15 +217,29 @@ export class Controller {
           break;
         }
 
-        if (sweet && sweet.food.id !== this.refusedFood && c.hunger > 0.15) {
-          const dist = steerTo(sweet.food.x, sweet.food.z, MOUTH_REACH * 0.8, 0.7);
-          s.cause = dist > MOUTH_REACH ? "배고파서 딸기로" : "딸기 맛보는 중";
+        // 처음 보는 간식은 배가 불러도 호기심에 한 번 다가가 맛본다
+        const unknown = habitat.foods.find((f) => care.s.tastes[f.kind] === undefined && f.id !== this.refusedFood);
+        if (unknown) {
+          const label = SNACKS[unknown.kind].label;
+          const dist = steerTo(unknown.x, unknown.z, MOUTH_REACH * 0.8, 0.6);
+          s.cause = dist > MOUTH_REACH ? `처음 보는 ${label}…` : `${label} 맛보는 중`;
+          if (dist < MOUTH_REACH) {
+            if (this.atFoodSince < 0) this.atFoodSince = now;
+            if (now - this.atFoodSince > 2.5) this.refusedFood = unknown.id; // 맛만 보고 반응은 뇌가 정한다
+          } else this.atFoodSince = -1;
+          break;
+        }
+
+        if (meal && meal.food.id !== this.refusedFood && c.hunger > 0.15) {
+          const label = SNACKS[meal.food.kind].label;
+          const dist = steerTo(meal.food.x, meal.food.z, MOUTH_REACH * 0.8, 0.7);
+          s.cause = dist > MOUTH_REACH ? `배고파서 ${label} 쪽으로` : `${label} 맛보는 중`;
           if (dist < MOUTH_REACH) {
             if (this.atFoodSince < 0) this.atFoodSince = now;
             // 맛을 봤는데 MN9 가 반응하지 않으면(배부름) 거절
             if (now - this.atFoodSince > 2 && c.hunger < 0.35) {
               this.onEvent("full");
-              this.refusedFood = sweet.food.id;
+              this.refusedFood = meal.food.id;
             }
           } else this.atFoodSince = -1;
           break;

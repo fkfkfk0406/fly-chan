@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EAT_SECONDS, Habitat } from "../src/world/Habitat.ts";
+import { EAT_SECONDS, Habitat, SNACKS, type FoodKind } from "../src/world/Habitat.ts";
 
 describe("Habitat 감각 입력", () => {
   const atWall = { x: 2.8, z: 0, heading: Math.PI / 2 };
@@ -48,5 +48,39 @@ describe("Habitat 먹이", () => {
     }
     expect(h.foods).toHaveLength(0);
     expect(eaten).toBeCloseTo(1, 5);
+  });
+});
+
+describe("간식별 미각 뉴런", () => {
+  const at = (x: number) => ({ x, z: 0, heading: 0 });
+
+  it("간식마다 다른 미각 뉴런을 자극한다", () => {
+    for (const [kind, snack] of Object.entries(SNACKS) as [FoodKind, (typeof SNACKS)[FoodKind]][]) {
+      const h = new Habitat();
+      h.addFood(kind, 0, 0);
+      const rates = h.sense(at(0), 0, 1, false);
+      expect(rates[snack.group], kind).toBeCloseTo(snack.rate, 5);
+    }
+  });
+
+  it("두 간식이 같이 놓여도 가장 가까운 하나만 맛본다 (동시 자극은 전뇌 폭주를 일으킨다)", () => {
+    const h = new Habitat();
+    h.addFood("salty", 0, 0);
+    h.addFood("bitter", 0.3, 0);
+    const rates = h.sense(at(0), 0, 1, false);
+    expect(rates.ir94e).toBeGreaterThan(0);
+    expect(rates.bitter).toBe(0);
+    const closerToBitter = h.sense(at(0.3), 0, 1, false);
+    expect(closerToBitter.bitter).toBeGreaterThan(0);
+    expect(closerToBitter.ir94e).toBe(0);
+  });
+
+  it("배고픔에 따라 달라지는 맛은 당 계열뿐이다", () => {
+    const h = new Habitat();
+    h.addFood("water", 0, 0);
+    expect(h.sense(at(0), 0, 0, false).water).toBeCloseTo(SNACKS.water.rate, 5);
+    const h2 = new Habitat();
+    h2.addFood("sweet", 0, 0);
+    expect(h2.sense(at(0), 0, 0, false).sugar).toBeCloseTo(SNACKS.sweet.rate * 0.25, 5);
   });
 });

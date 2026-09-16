@@ -4,7 +4,7 @@ import { BodyScene } from "./body/BodyScene.ts";
 import { createFallbackRig, loadVrmRig } from "./body/Rig.ts";
 import { NeuralField } from "./brain/NeuralField.ts";
 import { Care, DAILY_AFFECTION_CAP, STAGES } from "./care/Care.ts";
-import { DEFAULT_NAMES, cleanName, personalize } from "./story/personalize.ts";
+import { DEFAULT_NAMES, cleanName, hasBatchim, personalize } from "./story/personalize.ts";
 import { mutter } from "./story/scripts.ts";
 import { burst } from "./fx/Hearts.ts";
 import { Sfx } from "./fx/Sfx.ts";
@@ -13,7 +13,7 @@ import { DialogBox } from "./ui/DialogBox.ts";
 import { MOTOR_GROUPS, SENSORY_GROUPS, type Meta, type MotorGroup, type SensoryGroup } from "./sim/data.ts";
 import { NO_ADAPTATION } from "./sim/lif-engine.ts";
 import type { FromWorker, SimFrame, ToWorker } from "./sim/protocol.ts";
-import { Habitat, type FoodKind } from "./world/Habitat.ts";
+import { Habitat, SNACKS, type FoodKind } from "./world/Habitat.ts";
 
 const params = new URLSearchParams(location.search);
 // 적분 간격. ?dt=0.25 처럼 바꿀 수 있다 (작을수록 정확하지만 느림)
@@ -38,7 +38,8 @@ const MOTOR_LABEL: Record<MotorGroup, [string, string]> = {
   feed: ["MN9 · 섭식", "주둥이 운동뉴런 MN9"],
 };
 const SENSORY_LABEL: Record<SensoryGroup, string> = {
-  sugar: "당 GRN", bitter: "쓴맛 GRN", jo_touch: "JO-F 접촉", looming: "LPLC2 루밍", light: "R7/R8 빛",
+  sugar: "당 GRN", bitter: "쓴맛 GRN", water: "물 GRN", pharynx_sugar: "인두 당 GRN", ir94e: "Ir94e(짠맛)",
+  jo_touch: "JO-F 접촉", looming: "LPLC2 루밍", light: "R7/R8 빛",
 };
 const METER_MAX_HZ = 150;
 
@@ -55,7 +56,7 @@ let simRunning = true;
 let worldTime = 0;
 let simSpeed = 0;
 let lastFrame: SimFrame | undefined;
-const sentStim: Record<SensoryGroup, number> = { sugar: 0, bitter: 0, jo_touch: 0, looming: 0, light: 0 };
+const sentStim = Object.fromEntries(SENSORY_GROUPS.map((g) => [g, 0])) as Record<SensoryGroup, number>;
 
 // ---------------------------------------------------------------- 연출
 const sfx = new Sfx();
@@ -81,8 +82,11 @@ controller.onEvent = (e) => {
     case "ate": {
       sfx.chew();
       burst(at.x, at.y, 2, ["♪"]);
-      // 먹고 나면 딸기 자리에 과즙 얼룩이 남는다
-      const food = habitat.nearest(controller.state, "sweet");
+      const kind = controller.eatingKind ?? "sweet";
+      const label = SNACKS[kind].label;
+      care.log(Date.now(), `${label}${hasBatchim(label) ? "을" : "를"} ${kind === "water" ? "마셨어요" : "먹었어요"}.`);
+      // 달콤한 간식은 먹은 자리에 끈적한 얼룩을 남긴다
+      const food = kind === "sweet" || kind === "honey" ? habitat.nearest(controller.state, kind) : null;
       if (food) care.addMess("stain", food.food.x + 0.15, food.food.z + 0.1);
       break;
     }
@@ -113,6 +117,7 @@ function cleanUp(id?: number) {
 // ---------------------------------------------------------------- 대화
 const dialog = new DialogBox($("dialog"), {
   onOpen: () => {
+    setSnackMenu(false);
     document.body.classList.add("talking");
     controller.talking = true;
     body.setFocus(true);
@@ -271,11 +276,12 @@ applyNames();
 
 // ---------------------------------------------------------------- 돌봄
 function giveFood(kind: FoodKind) {
-  if (!ready) return;
+  if (!ready || dialog.open) return;
   if (care.s.asleep) return say("쿨쿨…");
   if (habitat.foods.length >= MAX_FOODS) habitat.foods.shift();
   habitat.addFoodInFront(controller.state, kind, 1);
-  if (kind === "bitter") care.log(Date.now(), "쓴 버섯을 줘 봤어요.");
+  const snack = SNACKS[kind];
+  if (kind === "bitter" || kind === "salty") care.log(Date.now(), `${snack.label}${hasBatchim(snack.label) ? "을" : "를"} 줘 봤어요.`);
 }
 
 function pet() {
@@ -324,7 +330,21 @@ const setPrank = (open: boolean) => {
   $("btn-prank").setAttribute("aria-expanded", String(open));
 };
 
-$("btn-feed").onclick = () => giveFood("sweet");
+const snackMenu = $("snack-menu");
+const setSnackMenu = (open: boolean) => {
+  snackMenu.hidden = !open;
+  $("btn-feed").setAttribute("aria-expanded", String(open));
+};
+$("btn-feed").onclick = () => {
+  setPrank(false);
+  setSnackMenu(snackMenu.hidden !== false);
+};
+for (const btn of document.querySelectorAll<HTMLElement>("[data-snack]")) {
+  btn.onclick = () => {
+    setSnackMenu(false);
+    giveFood(btn.dataset.snack as FoodKind);
+  };
+}
 $("btn-pet").onclick = pet;
 $("btn-clean").onclick = () => cleanUp();
 $("btn-talk").onclick = talk;
@@ -337,7 +357,10 @@ $("btn-mute").onclick = () => {
   updateMute();
 };
 updateMute();
-$("btn-prank").onclick = () => setPrank(prankMenu.hidden !== false);
+$("btn-prank").onclick = () => {
+  setSnackMenu(false);
+  setPrank(prankMenu.hidden !== false);
+};
 $("btn-bitter").onclick = () => {
   setPrank(false);
   giveFood("bitter");
@@ -383,6 +406,7 @@ window.addEventListener("keydown", (e) => {
     togglePanel("brain-panel", false);
     togglePanel("diary-panel", false);
     setPrank(false);
+    setSnackMenu(false);
   } else if (e.key === "f") giveFood("sweet");
   else if (e.key === "p") pet();
   else if (e.key === "c") cleanUp();
@@ -423,6 +447,9 @@ function frameLoop(now: number) {
     // 오늘 기록: 뇌 출력으로 먹거나 손질한 시간
     const b = controller.state.behavior;
     if (b === "feed") care.todayStats(Date.now()).feedSec += worldDt;
+    // 입에 닿은 간식의 MN9 반응을 기록한다 (안 먹어도 "맛은 봤다"로 남는다)
+    const tasting = controller.eatingKind ?? habitat.tasting(controller.state);
+    if (tasting && !care.s.asleep) care.noteTaste(tasting, controller.rates.feed);
     if (b === "groom") care.todayStats(Date.now()).groomSec += worldDt;
     const rates = habitat.sense(controller.state, worldTime, care.s.hunger, care.s.asleep);
     for (const g of SENSORY_GROUPS) sendStim(g, rates[g]);
@@ -530,13 +557,14 @@ function renderDiary() {
     return div;
   });
   $("diary-stats").replaceChildren(...stats);
+  for (const old of document.querySelectorAll("#diary-panel .note")) old.remove();
 
   // 오늘 모은 마음과 다음 단계 조건
   const room = care.affectionRoomToday;
   const hearts = Math.round(((DAILY_AFFECTION_CAP - room) / DAILY_AFFECTION_CAP) * 5);
   const next = care.nextStage();
   const hint = document.createElement("p");
-  hint.className = "next-stage";
+  hint.className = "note";
   hint.textContent =
     `오늘 모은 마음 ${"♥".repeat(hearts)}${"♡".repeat(5 - hearts)}` +
     (next
@@ -548,7 +576,17 @@ function renderDiary() {
         ].join(", ")
       : " · 이미 연인이에요 💞");
   $("diary-stats").after(hint);
-  hint.previousElementSibling?.parentElement?.querySelectorAll(".next-stage").forEach((el) => el !== hint && el.remove());
+
+  const tastes = Object.entries(care.s.tastes) as [FoodKind, number][];
+  const taste = document.createElement("p");
+  taste.className = "note";
+  taste.textContent = tastes.length
+    ? "뇌가 알려 준 취향 (먹는 동안 MN9 최고 발화율) · " +
+      tastes.sort((a, b) => b[1] - a[1])
+        .map(([kind, hz]) => `${SNACKS[kind].emoji} ${SNACKS[kind].label} ${hz.toFixed(0)} Hz${hz >= 60 ? " ♥" : hz >= 20 ? " ♡" : " ✖"}`)
+        .join(" · ")
+    : "아직 아무 간식도 맛보지 않았어요. 간식을 주면 뇌 반응으로 취향을 알 수 있어요.";
+  $("diary-stats").after(taste);
 
   const today = new Date(now).toDateString();
   $("diary-list").replaceChildren(

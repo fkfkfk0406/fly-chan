@@ -326,20 +326,43 @@ export class BodyScene {
 function makeFood(kind: Food["kind"]): THREE.Object3D {
   const g = new THREE.Group();
   const toon = (c: number) => new THREE.MeshToonMaterial({ color: c });
+  const add = (geo: THREE.BufferGeometry, mat: THREE.Material, y: number, scale?: [number, number, number]) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.y = y;
+    if (scale) m.scale.set(...scale);
+    g.add(m);
+    return m;
+  };
   if (kind === "sweet") {
-    const berry = new THREE.Mesh(new THREE.SphereGeometry(0.12, 20, 16), toon(0xe63950));
-    berry.scale.set(1, 1.15, 1);
-    berry.position.y = 0.13;
-    const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.05, 6), toon(0x4f9d57));
-    leaf.position.y = 0.27;
-    leaf.rotation.x = Math.PI;
-    g.add(berry, leaf);
+    // 딸기
+    add(new THREE.SphereGeometry(0.12, 20, 16), toon(0xe63950), 0.13, [1, 1.15, 1]);
+    add(new THREE.ConeGeometry(0.09, 0.05, 6), toon(0x4f9d57), 0.27).rotation.x = Math.PI;
+  } else if (kind === "honey") {
+    // 꿀단지
+    add(new THREE.CylinderGeometry(0.1, 0.08, 0.14, 16), toon(0xd9a441), 0.07);
+    add(new THREE.CylinderGeometry(0.11, 0.11, 0.03, 16), toon(0xb5763a), 0.15);
+    add(new THREE.SphereGeometry(0.05, 12, 10), toon(0xf6c343), 0.17, [1, 0.6, 1]);
+  } else if (kind === "water") {
+    // 물 접시
+    add(new THREE.CylinderGeometry(0.16, 0.13, 0.05, 20), toon(0xe9e2d6), 0.025);
+    const water = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.14, 0.14, 0.02, 20),
+      new THREE.MeshPhysicalMaterial({ color: 0x7ec8f0, transparent: true, opacity: 0.75, roughness: 0.1 }),
+    );
+    water.position.y = 0.055;
+    g.add(water);
+  } else if (kind === "salty") {
+    // 프레첼 모양 대신 소금 뿌린 크래커
+    add(new THREE.BoxGeometry(0.18, 0.03, 0.18), toon(0xe3b86b), 0.02);
+    for (const [x, z] of [[0.04, 0.03], [-0.05, 0.02], [0.01, -0.05], [0.06, -0.03]]) {
+      const salt = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 5), toon(0xffffff));
+      salt.position.set(x, 0.04, z);
+      g.add(salt);
+    }
   } else {
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.13, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), toon(0x7b4fa8));
-    cap.position.y = 0.14;
-    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.14, 12), toon(0xe9e2d6));
-    stem.position.y = 0.07;
-    g.add(cap, stem);
+    // 쓴 버섯
+    add(new THREE.SphereGeometry(0.13, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), toon(0x7b4fa8), 0.14);
+    add(new THREE.CylinderGeometry(0.04, 0.05, 0.14, 12), toon(0xe9e2d6), 0.07);
   }
   g.traverse((o) => (o.castShadow = true));
   return g;
