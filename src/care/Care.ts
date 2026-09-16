@@ -32,10 +32,10 @@ export const DAILY_AFFECTION_CAP = 0.06;
 
 /** 상점에서 파는 꾸미기 아이템 */
 export const COSMETICS = {
-  ribbon: { label: "리본", emoji: "🎀", price: 40, note: "머리에 다는 빨간 리본" },
-  scarf: { label: "목도리", emoji: "🧣", price: 60, note: "포근한 목도리" },
-  plant: { label: "화분", emoji: "🪴", price: 30, note: "창가에 두는 화분" },
-  frame: { label: "액자", emoji: "🖼️", price: 50, note: "둘이 함께 찍은 듯한 액자" },
+  ribbon: { label: "리본", emoji: "🎀", price: 40, bonus: 0.05, note: "머리에 다는 빨간 리본" },
+  scarf: { label: "목도리", emoji: "🧣", price: 60, bonus: 0.05, note: "포근한 목도리" },
+  plant: { label: "화분", emoji: "🪴", price: 30, bonus: 0.1, note: "창가에 두는 화분" },
+  frame: { label: "액자", emoji: "🖼️", price: 50, bonus: 0.15, note: "찍은 사진이 걸리는 액자" },
 } as const;
 export type CosmeticId = keyof typeof COSMETICS;
 
@@ -49,6 +49,43 @@ export const GIFT = { price: 35, affection: 0.02, mood: 0.2 };
 const HEART_RATE = { base: 3, byAffection: 12, maxIdleHours: 12 };
 /** 돌봄으로 얻는 하트의 하루 상한 */
 const HEART_CARE_CAP = 40;
+
+/** 지금까지 쌓인 기록 (업적 조건) */
+export interface Totals {
+  meals: number;
+  pets: number;
+  cleans: number;
+  talks: number;
+  sleeps: number;
+  scares: number;
+  grooms: number;
+  photos: number;
+}
+
+export interface Achievement {
+  id: string;
+  emoji: string;
+  name: string;
+  note: string;
+  reward: number;
+  done: (c: Care) => boolean;
+}
+
+/** 업적: 달성하면 하트를 준다 */
+export const ACHIEVEMENTS: Achievement[] = [
+  { id: "first-meal", emoji: "🍓", name: "첫 식사", note: "간식을 처음 먹었어요", reward: 10, done: (c) => c.s.totals.meals >= 1 },
+  { id: "gourmet", emoji: "👅", name: "미식가", note: "간식 네 가지를 모두 맛보기", reward: 30,
+    done: (c) => Object.keys(c.s.tastes).length >= 4 },
+  { id: "first-sleep", emoji: "💤", name: "잘 자", note: "불을 꺼서 재우기", reward: 10, done: (c) => c.s.totals.sleeps >= 1 },
+  { id: "groomer", emoji: "✋", name: "손이 많이 가", note: "쓰다듬어서 더듬이 손질 10번 보기", reward: 20,
+    done: (c) => c.s.totals.grooms >= 10 },
+  { id: "cleaner", emoji: "🧹", name: "청소왕", note: "얼룩 20개 치우기", reward: 25, done: (c) => c.s.totals.cleans >= 20 },
+  { id: "chatty", emoji: "💬", name: "수다쟁이", note: "대화 20번 하기", reward: 25, done: (c) => c.s.totals.talks >= 20 },
+  { id: "photographer", emoji: "📷", name: "사진사", note: "사진 5장 찍기", reward: 20, done: (c) => c.s.totals.photos >= 5 },
+  { id: "friend", emoji: "💞", name: "친구가 되다", note: "관계 '친구' 도달", reward: 30, done: (c) => c.s.stageSeen >= 1 },
+  { id: "lover", emoji: "💖", name: "연인이 되다", note: "관계 '연인' 도달", reward: 100, done: (c) => c.s.stageSeen >= 4 },
+  { id: "week", emoji: "📅", name: "일주일", note: "함께한 지 7일", reward: 50, done: (c) => c.daysTogether() >= 7 },
+];
 
 /** 오늘 하루 기록 (뇌 출력 기반 대화에 쓴다) */
 export interface TodayStats {
@@ -92,6 +129,11 @@ export interface CareState {
   /** 마지막으로 시간대 인사를 한 날 */
   greetedDay: string;
   today: TodayStats;
+  /** 지금까지 쌓인 기록과 달성한 업적 */
+  totals: Totals;
+  unlocked: string[];
+  /** 마지막으로 찍은 사진 (액자에 걸린다) */
+  photo: string;
   /** 하트: 상점 재화 */
   hearts: number;
   /** 자리를 비운 동안 모아 둔 하트 (돌아오면 받는다) */
@@ -166,6 +208,8 @@ export class Care {
       asleep: false, lightsOn: true, messes: [], dustIn: RATE.dustEvery,
       name: "", callMe: "", introDone: false,
       stageSeen: 0, gameHours: 0, gainDay: 0, gainToday: 0,
+      totals: { meals: 0, pets: 0, cleans: 0, talks: 0, sleeps: 0, scares: 0, grooms: 0, photos: 0 },
+      unlocked: [], photo: "",
       hearts: 20, pendingHearts: 0, stock: { sweet: 3, honey: 0, water: 2, salty: 0, bitter: 1 },
       owned: [], giftDay: -1, heartsToday: 0,
       greetedDay: "", today: emptyToday(now), recentTalks: [], tastes: {},
@@ -231,7 +275,7 @@ export class Care {
     if (this.cleanliness < 0.4) s.affection = clamp01(s.affection - RATE.dirty * h);
 
     // 하트 적립: 애정이 깊고 방이 깨끗할수록 많이 모인다
-    const perHour = (HEART_RATE.base + HEART_RATE.byAffection * s.affection) * (0.5 + 0.5 * this.cleanliness);
+    const perHour = (HEART_RATE.base + HEART_RATE.byAffection * s.affection) * (0.5 + 0.5 * this.cleanliness) * this.heartBonus;
     if (this.offline) s.pendingHearts = Math.min(s.pendingHearts + perHour * h, perHour * HEART_RATE.maxIdleHours);
     else s.hearts += perHour * h;
 
@@ -247,6 +291,25 @@ export class Care {
         0.35 * Math.max(0, s.sleepiness - 0.75) - 0.3 * Math.max(0, 0.7 - this.cleanliness),
     );
     s.mood += (target - s.mood) * (1 - Math.exp(-realSec / 120));
+  }
+
+  /** 꾸미기 아이템이 올려 주는 하트 적립 배수 */
+  get heartBonus(): number {
+    return 1 + this.s.owned.reduce((sum, id) => sum + COSMETICS[id].bonus, 0);
+  }
+
+  /** 기록을 남기고, 새로 달성한 업적이 있으면 돌려준다 */
+  record(kind: keyof Totals, now: number, amount = 1): Achievement[] {
+    this.s.totals[kind] += amount;
+    const got: Achievement[] = [];
+    for (const a of ACHIEVEMENTS) {
+      if (this.s.unlocked.includes(a.id) || !a.done(this)) continue;
+      this.s.unlocked.push(a.id);
+      this.s.hearts += a.reward;
+      this.log(now, `업적 달성: ${a.emoji} ${a.name} (+${a.reward} 하트)`);
+      got.push(a);
+    }
+    return got;
   }
 
   /** 기다리는 동안 모은 하트를 받는다. 받은 개수를 돌려준다 */
