@@ -295,6 +295,31 @@ body.talking .dock, body.talking .status, body.talking .bubble { display: none; 
 .chip-btn[aria-pressed="false"] { color: var(--dark-muted); }
 .fine { margin: 0; font-size: 11px; color: var(--dark-muted); line-height: 1.5; }
 
+/* 상점 */
+.hearts { width: auto; padding: 0 12px; gap: 5px; display: flex; align-items: center; font-size: 15px; }
+.hearts b { font-variant-numeric: tabular-nums; }
+.drawer.shop { left: 0; background: #fffafb; border-right: 1px solid var(--line); --slide: -40px; }
+.drawer-head h2 small { font-weight: 400; color: var(--muted); font-size: 12px; margin-left: 6px; }
+.shop-list { display: grid; gap: 6px; }
+.shop-item {
+  display: grid;
+  grid-template-columns: 30px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  text-align: left;
+  width: 100%;
+}
+.shop-item:disabled { opacity: 0.45; }
+.shop-item:not(:disabled):hover { border-color: var(--accent); background: var(--accent-soft); }
+.shop-item .icon { font-size: 22px; }
+.shop-item .name { display: grid; }
+.shop-item .name small { color: var(--muted); font-size: 11px; }
+.shop-item .price { font-weight: 700; color: var(--accent); white-space: nowrap; }
+
 /* 일기 */
 .entries { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .entries li { display: grid; grid-template-columns: 76px 1fr; gap: 8px; padding: 8px 0; border-bottom: 1px dashed var(--line); }

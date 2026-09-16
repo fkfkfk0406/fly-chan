@@ -36,6 +36,8 @@ export class BodyScene {
   private daylight = 1;
   private animator?: Animator;
   private rig?: Rig;
+  private readonly cosmetics = new Map<string, THREE.Object3D>();
+  private ownedCosmetics: string[] = [];
   private focus = false;
   private returning = false;
   private readonly savedOffset = new THREE.Vector3();
@@ -173,9 +175,87 @@ export class BodyScene {
 
   setRig(rig: Rig): void {
     this.rig = rig;
+    // 꾸미기는 캐릭터를 방에 놓기 전에 만든다 (그래야 모델 좌표 그대로 붙는다)
+    this.buildCosmetics(rig);
     this.animator = new Animator(rig);
     this.character.add(this.animator.poseRoot);
     rig.object.traverse((o) => (o.castShadow = true));
+    this.setCosmetics(this.ownedCosmetics);
+  }
+
+  /** 상점에서 산 꾸미기 아이템만 보이게 한다 */
+  setCosmetics(owned: readonly string[]): void {
+    this.ownedCosmetics = [...owned];
+    for (const [id, obj] of this.cosmetics) obj.visible = owned.includes(id);
+  }
+
+  /** 리본·목도리는 캐릭터에, 화분·액자는 방에 붙인다 */
+  private buildCosmetics(rig: Rig): void {
+    const toon = (c: number) => new THREE.MeshToonMaterial({ color: c });
+    rig.object.updateMatrixWorld(true);
+    const head = rig.attachNode("head");
+    const chest = rig.attachNode("upperChest");
+    const headPos = head?.getWorldPosition(new THREE.Vector3()) ?? new THREE.Vector3(0, rig.height * 0.85, 0);
+    const top = new THREE.Box3().setFromObject(rig.object).max.y;
+
+    // 🎀 리본: 정수리 옆
+    const ribbon = new THREE.Group();
+    for (const s of [1, -1]) {
+      const loop = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.018, 8, 16), toon(0xe8496b));
+      loop.position.x = s * 0.05;
+      loop.rotation.y = s * 0.5;
+      loop.scale.set(1, 0.8, 0.5);
+      ribbon.add(loop);
+    }
+    ribbon.add(new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), toon(0xc93459)));
+    this.attachTo(ribbon, head, new THREE.Vector3(0.07, top - (top - headPos.y) * 0.25, headPos.z + 0.02));
+    this.cosmetics.set("ribbon", ribbon);
+
+    // 🧣 목도리: 목 아래
+    const scarf = new THREE.Group();
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.032, 10, 20), toon(0x6fae7a));
+    band.rotation.x = Math.PI / 2;
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.22, 0.03), toon(0x6fae7a));
+    tail.position.set(0.05, -0.13, 0.07);
+    tail.rotation.z = 0.2;
+    scarf.add(band, tail);
+    const chestPos = chest?.getWorldPosition(new THREE.Vector3()) ?? new THREE.Vector3(0, rig.height * 0.72, 0);
+    this.attachTo(scarf, chest, new THREE.Vector3(0, chestPos.y + 0.12, chestPos.z));
+    this.cosmetics.set("scarf", scarf);
+
+    // 🪴 화분: 창가
+    const plant = new THREE.Group();
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.1, 0.24, 16), toon(0xd98f6b));
+    pot.position.y = 0.12;
+    const leaves = new THREE.Mesh(new THREE.IcosahedronGeometry(0.26, 1), toon(0x6fae7a));
+    leaves.position.y = 0.42;
+    plant.add(pot, leaves);
+    plant.position.set(1.7, 0, -ROOM_HALF + 0.45);
+    plant.traverse((o) => (o.castShadow = true));
+    this.scene.add(plant);
+    this.cosmetics.set("plant", plant);
+
+    // 🖼️ 액자: 왼쪽 벽
+    const frame = new THREE.Group();
+    const border = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.46, 0.62), toon(0xb5763a));
+    const photo = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.36, 0.52), toon(0xf7dbe4));
+    photo.position.x = 0.04;
+    const heart = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 10), toon(0xe8738f));
+    heart.position.set(0.06, 0, 0);
+    heart.scale.set(0.4, 1, 1);
+    frame.add(border, photo, heart);
+    frame.position.set(-ROOM_HALF + 0.08, 1.5, -0.6);
+    this.scene.add(frame);
+    this.cosmetics.set("frame", frame);
+  }
+
+  /** 모델 공간 위치로 노드에 붙인다 (노드의 휴지 회전 보정) */
+  private attachTo(part: THREE.Object3D, node: THREE.Object3D | undefined, modelPos: THREE.Vector3): void {
+    const parent = node ?? this.character;
+    parent.add(part);
+    part.position.copy(parent.worldToLocal(modelPos.clone()));
+    part.quaternion.copy(parent.getWorldQuaternion(new THREE.Quaternion()).invert());
+    part.traverse((o) => (o.castShadow = true));
   }
 
   private resize(): void {

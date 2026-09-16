@@ -3,7 +3,7 @@ import { BEHAVIOR_LABEL, Controller } from "./behavior/Controller.ts";
 import { BodyScene } from "./body/BodyScene.ts";
 import { createFallbackRig, loadVrmRig } from "./body/Rig.ts";
 import { NeuralField } from "./brain/NeuralField.ts";
-import { Care, DAILY_AFFECTION_CAP, STAGES } from "./care/Care.ts";
+import { COSMETICS, Care, DAILY_AFFECTION_CAP, GIFT, SNACK_PRICE, STAGES, type CosmeticId } from "./care/Care.ts";
 import { DEFAULT_NAMES, cleanName, hasBatchim, personalize } from "./story/personalize.ts";
 import { mutter } from "./story/scripts.ts";
 import { burst } from "./fx/Hearts.ts";
@@ -80,6 +80,7 @@ controller.onEvent = (e) => {
   const at = anchor();
   switch (e) {
     case "ate": {
+      earn(2);
       sfx.chew();
       burst(at.x, at.y, 2, ["♪"]);
       const kind = controller.eatingKind ?? "sweet";
@@ -108,6 +109,7 @@ function cleanUp(id?: number) {
   const before = care.s.messes.length;
   say(care.clean(Date.now(), id));
   if (care.s.messes.length < before) {
+    earn((before - care.s.messes.length) * 2);
     sfx.sparkle();
     const at = anchor();
     burst(at.x, at.y, id === undefined ? 8 : 3, ["✨", "✦"]);
@@ -133,6 +135,7 @@ const dialog = new DialogBox($("dialog"), {
   onTyping: (typing) => body.setTalking(typing),
   onTick: () => sfx.tick(),
   onChoice: (choice) => {
+    earn(1);
     sfx.choice();
     // 대화로 오르는 애정은 하루 다섯 번까지만
     const talks = care.todayStats(Date.now()).talks;
@@ -159,7 +162,10 @@ loadVrmRig(`${BASE}models/onna.vrm`)
     console.warn("VRM 로드 실패, 도형 인형으로 대체합니다:", err);
     return createFallbackRig();
   })
-  .then((rig) => body.setRig(rig));
+  .then((rig) => {
+    body.setRig(rig);
+    body.setCosmetics(care.s.owned); // 산 꾸미기 아이템 복원
+  });
 
 // ---------------------------------------------------------------- 뇌 패널 요소
 const meterEls = new Map<MotorGroup, { row: HTMLElement; fill: HTMLElement; val: HTMLElement }>();
@@ -244,6 +250,11 @@ function applyNames() {
 function wakeUp() {
   if (!ready || !care.named) return;
   $("overlay").hidden = true;
+  const got = care.collectPending(Date.now());
+  if (got > 0) {
+    say(`기다리면서 하트 ${got}개 모았어!`, 3);
+    setTimeout(() => burst(innerWidth / 2, innerHeight * 0.5, Math.min(10, got), ["💖"]), 400);
+  }
   if (care.s.asleep) say("💤", 2, true);
   else director.greetIfNeeded(Date.now());
 }
@@ -278,10 +289,25 @@ applyNames();
 function giveFood(kind: FoodKind) {
   if (!ready || dialog.open) return;
   if (care.s.asleep) return say("쿨쿨…");
+  if (!care.takeSnack(kind)) {
+    const label = SNACKS[kind].label;
+    say(`${label}${hasBatchim(label) ? "이" : "가"} 없어…`);
+    togglePanel("shop-panel", true);
+    return;
+  }
   if (habitat.foods.length >= MAX_FOODS) habitat.foods.shift();
   habitat.addFoodInFront(controller.state, kind, 1);
   const snack = SNACKS[kind];
   if (kind === "bitter" || kind === "salty") care.log(Date.now(), `${snack.label}${hasBatchim(snack.label) ? "을" : "를"} 줘 봤어요.`);
+}
+
+/** 돌봄으로 하트를 얻고, 얻었으면 하트 파티클 */
+function earn(amount: number) {
+  const got = care.earnHearts(amount);
+  if (got > 0) {
+    const at = anchor();
+    burst(at.x, at.y + 20, 1, ["💖"]);
+  }
 }
 
 function pet() {
@@ -290,6 +316,7 @@ function pet() {
   if (controller.wakeUp()) return;
   const line = care.on("petted", Date.now());
   say(line);
+  if (line !== "그만 좀 해!" && line !== "흥…") earn(1);
   if (line !== "그만~") {
     sfx.pet();
     const at = anchor();
@@ -314,14 +341,21 @@ function updateLightButton() {
   $("btn-light").querySelector("em")!.textContent = care.s.lightsOn ? "불 끄기" : "불 켜기";
 }
 
-function togglePanel(id: "brain-panel" | "diary-panel", open?: boolean) {
+type PanelId = "brain-panel" | "diary-panel" | "shop-panel";
+
+function togglePanel(id: PanelId, open?: boolean) {
   const panel = $(id);
   const show = open ?? panel.hidden;
+  // 서랍은 한 번에 하나만
+  if (show) for (const other of ["brain-panel", "diary-panel", "shop-panel"] as PanelId[]) if (other !== id) $(other).hidden = true;
   panel.hidden = !show;
   if (id === "brain-panel") {
     $("btn-brain").setAttribute("aria-expanded", String(show));
     if (show) openBrain();
-  } else if (show) renderDiary();
+  } else if (show) {
+    if (id === "diary-panel") renderDiary();
+    else renderShop();
+  }
 }
 
 const prankMenu = $("prank-menu");
@@ -372,8 +406,9 @@ $("btn-scare").onclick = () => {
 $("btn-light").onclick = toggleLights;
 $("btn-brain").onclick = () => togglePanel("brain-panel");
 $("btn-diary").onclick = () => togglePanel("diary-panel");
+$("btn-shop").onclick = () => togglePanel("shop-panel");
 for (const btn of document.querySelectorAll<HTMLElement>("[data-close]")) {
-  btn.onclick = () => togglePanel(btn.dataset.close as "brain-panel" | "diary-panel", false);
+  btn.onclick = () => togglePanel(btn.dataset.close as PanelId, false);
 }
 $("rotate-toggle").onclick = () => {
   const on = $("rotate-toggle").getAttribute("aria-pressed") !== "true";
@@ -405,6 +440,7 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     togglePanel("brain-panel", false);
     togglePanel("diary-panel", false);
+    togglePanel("shop-panel", false);
     setPrank(false);
     setSnackMenu(false);
   } else if (e.key === "f") giveFood("sweet");
@@ -484,6 +520,77 @@ requestAnimationFrame(frameLoop);
 // 개발 중 콘솔에서 상태를 만져 볼 수 있게
 if (import.meta.env.DEV) Object.assign(window, { onna: { controller, habitat, care, director, dialog } });
 
+// ---------------------------------------------------------------- 상점
+function shopItem(
+  emoji: string, name: string, note: string, price: number | null, disabled: boolean, onBuy: () => void,
+): HTMLButtonElement {
+  const btn = document.createElement("button");
+  btn.className = "shop-item";
+  btn.disabled = disabled;
+  const icon = document.createElement("span");
+  icon.className = "icon";
+  icon.textContent = emoji;
+  const label = document.createElement("span");
+  label.className = "name";
+  const strong = document.createElement("strong");
+  strong.textContent = name;
+  const small = document.createElement("small");
+  small.textContent = note;
+  label.append(strong, small);
+  const tag = document.createElement("span");
+  tag.className = "price";
+  tag.textContent = price === null ? "보유 중" : `💖 ${price}`;
+  btn.append(icon, label, tag);
+  btn.onclick = () => {
+    onBuy();
+    renderShop();
+    updateUi();
+  };
+  return btn;
+}
+
+function renderShop() {
+  const s = care.s;
+  const hearts = Math.floor(s.hearts);
+  $("shop-hearts").textContent = `💖 ${hearts}`;
+
+  $("shop-snacks").replaceChildren(
+    ...(Object.keys(SNACKS) as FoodKind[]).map((kind) => {
+      const snack = SNACKS[kind];
+      const price = SNACK_PRICE[kind];
+      return shopItem(snack.emoji, snack.label, `가진 개수 ${s.stock[kind]}개`, price, hearts < price, () => {
+        if (care.buySnack(kind)) sfx.choice();
+      });
+    }),
+  );
+
+  $("shop-cosmetics").replaceChildren(
+    ...(Object.keys(COSMETICS) as CosmeticId[]).map((id) => {
+      const item = COSMETICS[id];
+      const owned = s.owned.includes(id);
+      return shopItem(item.emoji, item.label, item.note, owned ? null : item.price, owned || hearts < item.price, () => {
+        if (care.buyCosmetic(id, Date.now())) {
+          sfx.sparkle();
+          body.setCosmetics(care.s.owned);
+          const at = anchor();
+          burst(at.x, at.y, 5, ["✨"]);
+        }
+      });
+    }),
+  );
+
+  const giftNote = s.giftDay === Math.floor(s.gameHours / 24) ? "오늘은 이미 선물했어요" : "하루 한 번, 애정이 조금 더 오릅니다";
+  $("shop-gift").replaceChildren(
+    shopItem("🎁", "선물 상자", giftNote, GIFT.price, !care.canGift, () => {
+      if (care.giveGift(Date.now())) {
+        sfx.levelUp();
+        say("이거… 나 주는 거야? 헤헤♡", 3);
+        burst(innerWidth / 2, innerHeight * 0.5, 8, ["♥", "🎁"]);
+      }
+    }),
+  );
+}
+
 // ---------------------------------------------------------------- UI 갱신
 function setGauge(id: string, value: number) {
   const bar = $(id);
@@ -500,6 +607,7 @@ function updateUi() {
   setGauge("g-clean", care.cleanliness);
   setGauge("g-love", s.affection);
   $("days").textContent = `함께한 지 ${care.daysTogether()}일`;
+  $("heart-count").textContent = String(Math.floor(care.s.hearts));
   $("stage").textContent = `💞 ${STAGES[care.s.stageSeen].name}`;
 
   const state = controller.state;

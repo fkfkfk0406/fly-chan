@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { Care, DAILY_AFFECTION_CAP } from "../src/care/Care.ts";
+import { Care, DAILY_AFFECTION_CAP, SNACK_PRICE } from "../src/care/Care.ts";
 
 // Node 에는 localStorage 가 없으니 메모리 구현을 붙인다
 const store = new Map<string, string>();
@@ -184,5 +184,66 @@ describe("Care 관계 단계", () => {
     expect(care.todayStats(day1)).toMatchObject({ pets: 1, meals: 1 });
     const day2 = new Date(2026, 8, 16, 9).getTime();
     expect(care.todayStats(day2)).toMatchObject({ pets: 0, meals: 0 });
+  });
+});
+
+describe("Care 하트와 상점", () => {
+  beforeEach(() => store.clear());
+
+  it("자리를 비운 동안 하트가 쌓이고, 돌아오면 받는다 (최대 12시간)", () => {
+    const now = 1_000 * H;
+    const care = Care.load(now);
+    care.s.affection = 0.5;
+    care.save(now);
+    const back = Care.load(now + 5 * H);
+    expect(back.s.pendingHearts).toBeGreaterThan(0);
+    const hearts = back.s.hearts;
+    const got = back.collectPending(now + 5 * H);
+    expect(got).toBeGreaterThan(0);
+    expect(back.s.hearts).toBeCloseTo(hearts + got, 5);
+    expect(back.s.diary[0].text).toContain("하트");
+    // 오래 비워도 12시간치까지만
+    const long = Care.load(now);
+    long.s.affection = 0.5;
+    long.save(now);
+    const back2 = Care.load(now + 48 * H);
+    expect(back2.s.pendingHearts).toBeLessThan(12 * 20);
+  });
+
+  it("간식은 재고에서 꺼내 쓰고, 하트로 산다", () => {
+    const care = Care.load(0);
+    const stock = care.s.stock.sweet;
+    expect(care.takeSnack("sweet")).toBe(true);
+    expect(care.s.stock.sweet).toBe(stock - 1);
+    care.s.stock.honey = 0;
+    expect(care.takeSnack("honey")).toBe(false);
+    care.s.hearts = 100;
+    expect(care.buySnack("honey", 2)).toBe(true);
+    expect(care.s.stock.honey).toBe(2);
+    expect(care.s.hearts).toBe(100 - SNACK_PRICE.honey * 2);
+    care.s.hearts = 1;
+    expect(care.buySnack("honey")).toBe(false);
+  });
+
+  it("꾸미기는 한 번만 사고, 선물은 하루 한 번이다", () => {
+    const care = Care.load(0);
+    care.s.hearts = 500;
+    expect(care.buyCosmetic("ribbon", 0)).toBe(true);
+    expect(care.buyCosmetic("ribbon", 0)).toBe(false); // 이미 가짐
+    expect(care.s.owned).toEqual(["ribbon"]);
+    expect(care.giveGift(0)).toBe(true);
+    expect(care.canGift).toBe(false);
+    expect(care.giveGift(0)).toBe(false);
+    care.s.gameHours = 24; // 다음 날
+    expect(care.canGift).toBe(true);
+  });
+
+  it("돌봄으로 얻는 하트는 하루 상한이 있다", () => {
+    const care = Care.load(0);
+    let total = 0;
+    for (let k = 0; k < 100; k++) total += care.earnHearts(2);
+    expect(total).toBe(40);
+    care.s.gameHours = 24;
+    expect(care.earnHearts(2)).toBe(2);
   });
 });

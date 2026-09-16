@@ -30,6 +30,26 @@ export const MOOD_TO_ADVANCE = 0.6;
 /** 하루(게임 시간 24h)에 오를 수 있는 애정 상한 */
 export const DAILY_AFFECTION_CAP = 0.06;
 
+/** 상점에서 파는 꾸미기 아이템 */
+export const COSMETICS = {
+  ribbon: { label: "리본", emoji: "🎀", price: 40, note: "머리에 다는 빨간 리본" },
+  scarf: { label: "목도리", emoji: "🧣", price: 60, note: "포근한 목도리" },
+  plant: { label: "화분", emoji: "🪴", price: 30, note: "창가에 두는 화분" },
+  frame: { label: "액자", emoji: "🖼️", price: 50, note: "둘이 함께 찍은 듯한 액자" },
+} as const;
+export type CosmeticId = keyof typeof COSMETICS;
+
+/** 간식 가격 (하트) */
+export const SNACK_PRICE: Record<FoodKind, number> = {
+  sweet: 5, honey: 9, water: 3, salty: 4, bitter: 2,
+};
+/** 선물: 하루 한 번, 애정을 조금 더 올린다 */
+export const GIFT = { price: 35, affection: 0.02, mood: 0.2 };
+/** 시간당 하트 적립 (애정·청결에 비례), 자리를 비운 동안 쌓이는 최대 시간 */
+const HEART_RATE = { base: 3, byAffection: 12, maxIdleHours: 12 };
+/** 돌봄으로 얻는 하트의 하루 상한 */
+const HEART_CARE_CAP = 40;
+
 /** 오늘 하루 기록 (뇌 출력 기반 대화에 쓴다) */
 export interface TodayStats {
   day: string; // 로컬 날짜 YYYY-MM-DD
@@ -72,6 +92,18 @@ export interface CareState {
   /** 마지막으로 시간대 인사를 한 날 */
   greetedDay: string;
   today: TodayStats;
+  /** 하트: 상점 재화 */
+  hearts: number;
+  /** 자리를 비운 동안 모아 둔 하트 (돌아오면 받는다) */
+  pendingHearts: number;
+  /** 간식 재고 */
+  stock: Record<FoodKind, number>;
+  /** 산 꾸미기 아이템 */
+  owned: CosmeticId[];
+  /** 마지막으로 선물한 게임 날짜 */
+  giftDay: number;
+  /** 오늘 돌봄으로 얻은 하트 */
+  heartsToday: number;
   /** 간식별로 관찰한 MN9 최고 발화율 (Hz). 뇌 반응으로 알아낸 취향 */
   tastes: Partial<Record<FoodKind, number>>;
   /** 최근에 한 대화 주제 id (반복 줄이기) */
@@ -118,6 +150,8 @@ export class Care {
   /** 시간 배속 (?time=60 이면 1분이 1시간). 시연·테스트용 */
   readonly timeScale: number;
   private petTimes: number[] = [];
+  /** 자리를 비운 시간을 흘려보내는 중인지 (하트가 pendingHearts 로 쌓인다) */
+  private offline = false;
   /** 이번에 열었을 때 닫혀 있던 시간 (게임 시간, h) */
   awayHours = 0;
 
@@ -132,6 +166,8 @@ export class Care {
       asleep: false, lightsOn: true, messes: [], dustIn: RATE.dustEvery,
       name: "", callMe: "", introDone: false,
       stageSeen: 0, gameHours: 0, gainDay: 0, gainToday: 0,
+      hearts: 20, pendingHearts: 0, stock: { sweet: 3, honey: 0, water: 2, salty: 0, bitter: 1 },
+      owned: [], giftDay: -1, heartsToday: 0,
       greetedDay: "", today: emptyToday(now), recentTalks: [], tastes: {},
       bornAt: now, lastSeen: now,
       diary: [],
@@ -158,12 +194,14 @@ export class Care {
     this.awayHours = hours;
     if (hours < 1 / 60) return;
     const wasAsleep = this.s.asleep;
+    this.offline = true;
     // 1분 단위로 흘린다 (최대 72시간 = 4320 스텝)
     const steps = Math.ceil(hours * 60);
     for (let k = 0; k < steps; k++) {
       this.passTime((hours * HOUR) / steps / this.timeScale);
       if (this.s.asleep && this.s.sleepiness <= 0) this.s.asleep = false;
     }
+    this.offline = false;
     const lonely = Math.max(0, hours - 24) / 24;
     this.s.affection = clamp01(this.s.affection - LONELY_PER_DAY * lonely);
     this.s.lastSeen = now;
@@ -192,6 +230,11 @@ export class Care {
     if (s.hunger >= 0.95) s.affection = clamp01(s.affection - RATE.neglect * h);
     if (this.cleanliness < 0.4) s.affection = clamp01(s.affection - RATE.dirty * h);
 
+    // 하트 적립: 애정이 깊고 방이 깨끗할수록 많이 모인다
+    const perHour = (HEART_RATE.base + HEART_RATE.byAffection * s.affection) * (0.5 + 0.5 * this.cleanliness);
+    if (this.offline) s.pendingHearts = Math.min(s.pendingHearts + perHour * h, perHour * HEART_RATE.maxIdleHours);
+    else s.hearts += perHour * h;
+
     s.dustIn -= h;
     if (s.dustIn <= 0) {
       s.dustIn += RATE.dustEvery;
@@ -204,6 +247,68 @@ export class Care {
         0.35 * Math.max(0, s.sleepiness - 0.75) - 0.3 * Math.max(0, 0.7 - this.cleanliness),
     );
     s.mood += (target - s.mood) * (1 - Math.exp(-realSec / 120));
+  }
+
+  /** 기다리는 동안 모은 하트를 받는다. 받은 개수를 돌려준다 */
+  collectPending(now: number): number {
+    const got = Math.floor(this.s.pendingHearts);
+    if (got <= 0) return 0;
+    this.s.hearts += got;
+    this.s.pendingHearts -= got;
+    this.log(now, `기다리는 동안 하트 ${got}개를 모아 뒀어요.`);
+    return got;
+  }
+
+  /** 돌봄으로 하트를 얻는다 (하루 상한 있음) */
+  earnHearts(amount: number): number {
+    this.rollGainDay();
+    const got = Math.min(amount, Math.max(0, HEART_CARE_CAP - this.s.heartsToday));
+    this.s.heartsToday += got;
+    this.s.hearts += got;
+    return got;
+  }
+
+  spend(price: number): boolean {
+    if (this.s.hearts < price) return false;
+    this.s.hearts -= price;
+    return true;
+  }
+
+  /** 간식 구매 */
+  buySnack(kind: FoodKind, count = 1): boolean {
+    if (!this.spend(SNACK_PRICE[kind] * count)) return false;
+    this.s.stock[kind] += count;
+    return true;
+  }
+
+  /** 꾸미기 구매 */
+  buyCosmetic(id: CosmeticId, now: number): boolean {
+    if (this.s.owned.includes(id) || !this.spend(COSMETICS[id].price)) return false;
+    this.s.owned.push(id);
+    this.log(now, `${COSMETICS[id].emoji} ${COSMETICS[id].label}${hasBatchim(COSMETICS[id].label) ? "을" : "를"} 샀어요.`);
+    return true;
+  }
+
+  /** 선물하기: 하루 한 번 */
+  giveGift(now: number): boolean {
+    this.rollGainDay();
+    const day = Math.floor(this.s.gameHours / 24);
+    if (this.s.giftDay === day || !this.spend(GIFT.price)) return false;
+    this.s.giftDay = day;
+    this.bump(GIFT.mood, GIFT.affection);
+    this.log(now, "선물을 줬어요. 아주 좋아했어요 🎁");
+    return true;
+  }
+
+  get canGift(): boolean {
+    return this.s.giftDay !== Math.floor(this.s.gameHours / 24) && this.s.hearts >= GIFT.price;
+  }
+
+  /** 간식을 하나 꺼낸다 (재고가 없으면 false) */
+  takeSnack(kind: FoodKind): boolean {
+    if (this.s.stock[kind] <= 0) return false;
+    this.s.stock[kind]--;
+    return true;
   }
 
   /** 함께한 날 (게임 시간 기준, 첫날 = 1) */
@@ -262,6 +367,7 @@ export class Care {
     if (day !== this.s.gainDay) {
       this.s.gainDay = day;
       this.s.gainToday = 0;
+      this.s.heartsToday = 0;
     }
   }
 
