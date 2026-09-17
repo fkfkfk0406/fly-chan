@@ -1,6 +1,7 @@
 // 다마고치식 돌봄 상태. 뇌 시뮬레이션 밖의 "게임 상태"다.
 // 배고픔만 뇌에 닿는다(배고플수록 당 GRN 입력이 세짐, Habitat.sense). 나머지는 행동 선택·표정·말풍선에 쓴다.
 import { hasBatchim } from "../story/personalize.ts";
+import { hourOf, sleepinessFactor } from "../world/Clock.ts";
 import { ROOM_HALF, SNACKS, insideBed, type FoodKind } from "../world/Habitat.ts";
 
 export type CareEvent =
@@ -245,8 +246,9 @@ export class Care {
     this.offline = true;
     // 1분 단위로 흘린다 (최대 72시간 = 4320 스텝)
     const steps = Math.ceil(hours * 60);
+    const stepMs = (hours * 3.6e6) / steps / this.timeScale;
     for (let k = 0; k < steps; k++) {
-      this.passTime((hours * HOUR) / steps / this.timeScale);
+      this.passTime((hours * HOUR) / steps / this.timeScale, hourOf(this.s.lastSeen + k * stepMs));
       if (this.s.asleep && this.s.sleepiness <= 0) this.s.asleep = false;
     }
     this.offline = false;
@@ -263,8 +265,8 @@ export class Care {
     this.log(now, [`${away} 동안 기다렸어요.`, ...notes].join(" "));
   }
 
-  /** realSec 초만큼 시간 경과 (배속 적용) */
-  passTime(realSec: number): void {
+  /** realSec 초만큼 시간 경과 (배속 적용). hour 는 그 시점의 실제 시각 (생체시계) */
+  passTime(realSec: number, hour = 12): void {
     const h = (realSec * this.timeScale) / HOUR;
     const s = this.s;
     s.gameHours += h;
@@ -273,7 +275,7 @@ export class Care {
       s.sleepiness = clamp01(s.sleepiness - RATE.sleepRecover * h);
     } else {
       s.hunger = clamp01(s.hunger + RATE.hungerAwake * h);
-      s.sleepiness = clamp01(s.sleepiness + RATE.sleepyAwake * h);
+      s.sleepiness = clamp01(s.sleepiness + RATE.sleepyAwake * sleepinessFactor(hour) * h);
     }
     if (s.hunger >= 0.95) s.affection = clamp01(s.affection - RATE.neglect * h);
     if (this.cleanliness < 0.4) s.affection = clamp01(s.affection - RATE.dirty * h);

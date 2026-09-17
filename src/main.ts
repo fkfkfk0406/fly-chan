@@ -19,6 +19,7 @@ import { DialogBox } from "./ui/DialogBox.ts";
 import { MOTOR_GROUPS, SENSORY_GROUPS, type Meta, type MotorGroup, type SensoryGroup } from "./sim/data.ts";
 import { NO_ADAPTATION } from "./sim/lif-engine.ts";
 import type { FromWorker, SimFrame, ToWorker } from "./sim/protocol.ts";
+import { hourOf } from "./world/Clock.ts";
 import { Habitat, SNACKS, type FoodKind } from "./world/Habitat.ts";
 
 const params = new URLSearchParams(location.search);
@@ -46,6 +47,7 @@ const MOTOR_LABEL: Record<MotorGroup, [string, string]> = {
 const SENSORY_LABEL: Record<SensoryGroup, string> = {
   sugar: "당 GRN", bitter: "쓴맛 GRN", water: "물 GRN", pharynx_sugar: "인두 당 GRN", ir94e: "Ir94e(짠맛)",
   jo_touch: "JO-F 접촉", looming: "LPLC2 루밍", light: "R7/R8 빛", pc1: "pC1 설렘",
+  clock_lnv: "시계 LNv(아침)", clock_lnd: "시계 LNd(저녁)", clock_dn1: "시계 DN1(새벽·해질녘)",
 };
 const METER_MAX_HZ = 150;
 
@@ -584,7 +586,8 @@ function frameLoop(now: number) {
   const dt = Math.min(0.1, (now - lastTime) / 1000);
   lastTime = now;
 
-  care.passTime(dt);
+  const hour = hourOf(Date.now());
+  care.passTime(dt, hour);
   // 뇌 시뮬이 실시간보다 느리면 몸도 같은 비율로 느려진다
   const worldDt = ready && simRunning ? dt * Math.min(simSpeed, 1) : 0;
   if (worldDt > 0) {
@@ -599,7 +602,7 @@ function frameLoop(now: number) {
     const tasting = controller.eatingKind ?? habitat.tasting(controller.state);
     if (tasting && !care.s.asleep) care.noteTaste(tasting, controller.rates.feed);
     if (b === "groom") care.todayStats(Date.now()).groomSec += worldDt;
-    const rates = habitat.sense(controller.state, worldTime, care.s.hunger, care.s.asleep, care.thrill);
+    const rates = habitat.sense(controller.state, worldTime, care.s.hunger, care.s.asleep, care.thrill, hour);
     for (const g of SENSORY_GROUPS) sendStim(g, rates[g]);
   }
   body.render(dt, controller.state, habitat.foods, care.s.messes, care.s.lightsOn, care.s.mood);

@@ -1,4 +1,5 @@
 import type { SensoryGroup } from "../sim/data.ts";
+import { CLOCK_MAX_HZ, clockActivity } from "./Clock.ts";
 
 export type FoodKind = "sweet" | "honey" | "water" | "salty" | "bitter";
 
@@ -134,7 +135,7 @@ export class Habitat {
    *   pC1 은 이 모델의 어떤 감각 입력으로도 켜지지 않아서(scripts/pc1-probe.ts, song-probe.ts),
    *   "마음은 게임 상태, 그 마음이 몸에 나타나는 방식은 뇌"로 연결한다 (CoTFly 의 신경 게인과 같은 발상)
    */
-  sense(pose: Pose, now: number, hunger: number, asleep: boolean, thrill = 0): Record<SensoryGroup, number> {
+  sense(pose: Pose, now: number, hunger: number, asleep: boolean, thrill = 0, hour = 12): Record<SensoryGroup, number> {
     const wall = this.wallDistance(pose);
     if (!asleep && wall < WALL_TOUCH && this.wallArmed) {
       this.wallTouchUntil = now + WALL_TOUCH_SEC;
@@ -148,6 +149,11 @@ export class Habitat {
       // 눈을 감고 있거나 불이 꺼져 있으면 광수용체 입력 없음
       light: this.lightsOn && !asleep ? 8 : 0,
       pc1: asleep ? 0 : clamp(thrill, 0, 1) * PC1_MAX_HZ,
+      // 생체시계는 자는 동안에도 돈다
+      ...(() => {
+        const c = clockActivity(hour);
+        return { clock_lnv: c.lnv * CLOCK_MAX_HZ, clock_lnd: c.lnd * CLOCK_MAX_HZ, clock_dn1: c.dn1 * CLOCK_MAX_HZ };
+      })(),
     };
     if (asleep) return rates;
     // 입에 닿은 간식 중 가장 가까운 하나만 맛본다.

@@ -5,6 +5,9 @@ import type { AccessoryAnchor, BoneName, ExpressionName, Rig } from "./Rig.ts";
 
 type Side = 1 | -1;
 
+/** 방 안에서 잘 보이도록 실제 비율보다 크게 */
+const SIZE = 1.4;
+
 interface Leg {
   side: Side;
   /** 0 앞다리, 1 가운뎃다리, 2 뒷다리 */
@@ -38,8 +41,8 @@ export class FlyAvatar implements Rig {
   readonly kind = "fly" as const;
   readonly poseRoot = new THREE.Group();
   readonly object = new THREE.Group();
-  readonly hipsHeight = 0.3;
-  readonly height = 0.55;
+  readonly hipsHeight = 0.3 * SIZE;
+  readonly height = 0.55 * SIZE;
   exprOverride: Expr | undefined;
   talking = false;
 
@@ -55,8 +58,9 @@ export class FlyAvatar implements Rig {
 
   constructor() {
     const toon = (c: number) => new THREE.MeshToonMaterial({ color: c });
-    const body = toon(0xa9773f);
-    const dark = toon(0x5a3a1c);
+    const body = toon(0xc08440);
+    const dark = toon(0x3a2412);
+    const leg = toon(0x4d3119);
     const mesh = (geo: THREE.BufferGeometry, mat: THREE.Material, parent: THREE.Object3D, pos: [number, number, number], scale?: [number, number, number]) => {
       const m = new THREE.Mesh(geo, mat);
       m.position.set(...pos);
@@ -75,11 +79,12 @@ export class FlyAvatar implements Rig {
     this.thorax.add(this.head);
     mesh(new THREE.SphereGeometry(0.12, 20, 16), toon(0xb5824a), this.head, [0, 0, 0]);
     for (const s of [1, -1] as Side[]) {
-      mesh(new THREE.SphereGeometry(0.075, 16, 12), toon(0xc62828), this.head, [s * 0.085, 0.02, 0.03], [0.7, 1, 0.9]);
+      const eye = new THREE.MeshPhongMaterial({ color: 0xd32f2f, emissive: 0x4a0a0a, shininess: 80, specular: 0xffc0c0 });
+      mesh(new THREE.SphereGeometry(0.075, 20, 16), eye, this.head, [s * 0.085, 0.02, 0.03], [0.7, 1, 0.9]);
       const antenna = new THREE.Group();
       antenna.position.set(s * 0.03, 0.09, 0.08);
-      mesh(new THREE.CylinderGeometry(0.008, 0.012, 0.09, 6), dark, antenna, [0, 0.045, 0]);
-      mesh(new THREE.SphereGeometry(0.018, 8, 6), dark, antenna, [0, 0.095, 0]);
+      mesh(new THREE.CylinderGeometry(0.012, 0.016, 0.11, 8), dark, antenna, [0, 0.055, 0]);
+      mesh(new THREE.SphereGeometry(0.026, 10, 8), dark, antenna, [0, 0.115, 0]);
       antenna.rotation.set(0.5, 0, s * -0.3);
       this.head.add(antenna);
       this.antennae.push(antenna);
@@ -121,8 +126,11 @@ export class FlyAvatar implements Rig {
         const femur = new THREE.Group();
         const knee = new THREE.Group();
         knee.position.y = -0.2;
-        mesh(new THREE.CylinderGeometry(0.016, 0.02, 0.2, 6), dark, femur, [0, -0.1, 0]);
-        mesh(new THREE.CylinderGeometry(0.01, 0.015, 0.36, 6), dark, knee, [0, -0.18, 0]);
+        mesh(new THREE.SphereGeometry(0.024, 10, 8), leg, femur, [0, 0, 0]);
+        mesh(new THREE.CylinderGeometry(0.019, 0.024, 0.2, 10), leg, femur, [0, -0.1, 0]);
+        mesh(new THREE.SphereGeometry(0.021, 10, 8), leg, knee, [0, 0, 0]);
+        mesh(new THREE.CylinderGeometry(0.011, 0.018, 0.36, 10), leg, knee, [0, -0.18, 0]);
+        mesh(new THREE.SphereGeometry(0.016, 8, 6), leg, knee, [0, -0.36, 0]);
         femur.add(knee);
         hip.add(femur);
         this.thorax.add(hip);
@@ -132,6 +140,7 @@ export class FlyAvatar implements Rig {
       }
     }
 
+    this.object.scale.setScalar(SIZE);
     this.poseRoot.add(this.object);
   }
 
@@ -146,8 +155,8 @@ export class FlyAvatar implements Rig {
   /** 리본은 더듬이 옆 정수리, 목도리는 머리와 가슴 사이 */
   accessoryAnchors(): Record<"ribbon" | "scarf", AccessoryAnchor> {
     return {
-      ribbon: { node: this.head, position: new THREE.Vector3(0.11, 0.47, 0.25), rotation: new THREE.Euler(0, 0.4, -0.35), scale: 1.1 },
-      scarf: { node: this.thorax, position: new THREE.Vector3(0, 0.36, 0.13), rotation: new THREE.Euler(1.35, 0, 0), scale: 1.65 },
+      ribbon: { node: this.head, position: new THREE.Vector3(0.11, 0.47, 0.25).multiplyScalar(SIZE), rotation: new THREE.Euler(0, 0.4, -0.35), scale: 1.1 },
+      scarf: { node: this.thorax, position: new THREE.Vector3(0, 0.36, 0.13).multiplyScalar(SIZE), rotation: new THREE.Euler(1.35, 0, 0), scale: 1.65 },
     };
   }
 
@@ -186,7 +195,7 @@ export class FlyAvatar implements Rig {
     for (const key of Object.keys(REST) as (keyof Params)[]) this.p[key] += (target[key] - this.p[key]) * k;
     const p = this.p;
 
-    this.poseRoot.position.y = p.lift;
+    this.poseRoot.position.y = p.lift * SIZE;
     this.object.rotation.x = p.bodyPitch;
     this.head.rotation.x = p.headPitch;
     this.proboscis.scale.y = p.proboscis;

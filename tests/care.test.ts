@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { Care, DAILY_AFFECTION_CAP, SNACK_PRICE } from "../src/care/Care.ts";
+import { clockActivity } from "../src/world/Clock.ts";
 
 // Node 에는 localStorage 가 없으니 메모리 구현을 붙인다
 const store = new Map<string, string>();
@@ -36,7 +37,7 @@ describe("Care", () => {
   });
 
   it("닫아 둔 시간만큼 배고픔·졸림이 늘고 일기에 남는다", () => {
-    const now = 1_000 * H;
+    const now = new Date(2026, 8, 15, 12).getTime(); // 정오 (생체시계 배수 1)
     Care.load(now).save(now);
     const later = Care.load(now + 1 * H);
     expect(later.s.hunger).toBeCloseTo(0.45 + 0.3, 5); // 0.3/h × 1h
@@ -293,5 +294,29 @@ describe("Care 설렘", () => {
     close.s.mood = 1;
     for (let k = 0; k < 60; k++) close.passTime(1);
     expect(close.thrill).toBeGreaterThan(0.5); // 연인이고 기분 좋으면 늘 두근두근
+  });
+});
+
+describe("생체시계", () => {
+  beforeEach(() => store.clear());
+
+  it("같은 시간을 비워도 밤에는 졸림이 더 빨리 쌓인다", () => {
+    const noon = new Date(2026, 8, 15, 12).getTime();
+    const night = new Date(2026, 8, 15, 23).getTime();
+    Care.load(noon).save(noon);
+    const a = Care.load(noon + 1 * H).s.sleepiness;
+    store.clear();
+    Care.load(night).save(night);
+    const b = Care.load(night + 1 * H).s.sleepiness;
+    expect(b - 0.2).toBeGreaterThan((a - 0.2) * 1.5);
+  });
+
+  it("시계 뉴런은 아침엔 LNv, 저녁엔 LNd, 새벽·해질녘엔 DN1 이 가장 활발하다", () => {
+    const morning = clockActivity(7.5);
+    const evening = clockActivity(19);
+    expect(morning.lnv).toBeGreaterThan(morning.lnd);
+    expect(evening.lnd).toBeGreaterThan(evening.lnv);
+    expect(clockActivity(6).dn1).toBeGreaterThan(clockActivity(13).dn1);
+    expect(clockActivity(20.5).dn1).toBeCloseTo(1, 5);
   });
 });

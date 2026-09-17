@@ -28,7 +28,7 @@ let speedEma = 1;
 // 인스펙터에 보여 줄 핵심 뉴런: 그룹마다 대표 뉴런 하나
 const PROBES: [string, keyof Groups][] = [
   ["당 GRN", "sugar"], ["쓴맛 GRN", "bitter"], ["물 GRN", "water"], ["JO-F 접촉", "jo_touch"], ["LPLC2 루밍", "looming"],
-  ["pC1 설렘", "pc1"], ["MN9 섭식", "feed"], ["Giant Fiber", "escape"], ["그루밍 DN", "groom"], ["DNa 좌회전", "turn_left"], ["P9 전진", "forward"],
+  ["pC1 설렘", "pc1"], ["MN9 섭식", "feed"], ["Giant Fiber", "escape"], ["그루밍 DN", "groom"], ["DNa 좌회전", "turn_left"], ["P9 전진", "forward"], ["시계 LNv 아침", "clock_lnv"], ["시계 LNd 저녁", "clock_lnd"],
 ];
 let probeIdx: number[] = [];
 let probeSeen: number[] = [];
