@@ -1,6 +1,6 @@
 # 진행 상황과 다음 할 일
 
-다른 PC나 새 대화에서 이어서 작업할 때 이 문서부터 읽으세요. 프로젝트 설명과 실행 방법은 [README](../README.md)에 있습니다.
+다른 PC나 새 대화에서 이어서 작업할 때 이 문서부터 읽으세요. **새 PC 준비와 검증 체크리스트는 [NEW-PC.md](NEW-PC.md).** 프로젝트 설명과 실행 방법은 [README](../README.md)에 있습니다.
 
 ## 지금 상태 (2026-09-17)
 
@@ -62,7 +62,8 @@
 
 - **구현됨:** `src-tauri/`(작은 테두리 없는 창·오른쪽 아래 배치·트레이 메뉴[보이기/항상 위/자동 시작/종료]·닫기=트레이·두 번 실행 방지), `src/desktop.ts`(제목 줄: 📌 항상 위, 작게, 숨기기), `src/util/assets.ts`(첫 실행 때 Releases 에서 받아 Cache Storage), 창 숨김 동안 시뮬 정지 + 복귀 때 `Care.resume` 으로 경과 시간 반영(웹 탭에도 적용), 데스크톱에서 질투 끔.
 - **실행:** `npm run desktop`(개발, Vite 의 public/ 데이터 사용) / `npm run desktop:build`(설치 파일, `src-tauri/target/release/bundle/nsis/`).
-- **배포 전에 할 일:** Releases 에 `data-v783` 태그로 `public/data/*` 8개 + `public/models/fly-chan.vrm` 올리기 (`gh release create data-v783 public/data/* public/models/fly-chan.vrm`). 파일 이름은 `ASSET_FILES` 의 마지막 부분과 같아야 한다.
+- **데이터 릴리스:** `data-v783`(사전 릴리스)에 `public/data/*` 8개 + `fly-chan.vrm` 업로드 완료. 파일 이름은 `ASSET_FILES` 의 마지막 부분과 같아야 한다.
+- **자동 업데이트·배포:** `tauri-plugin-updater` + `.github/workflows/release.yml`(v* 태그 → 빌드·서명·`latest.json`). 새 버전은 `npm run release`. 아직 CI·실제 업데이트 미검증 → [NEW-PC.md](NEW-PC.md) 체크리스트.
 - 이름 변경(ONNA → 플라이쨩/fly-chan): 예전 저장 키 `onna-care-v2`·IndexedDB `onna-files`는 이어받는다.
 
 ### 처음 구상 메모
