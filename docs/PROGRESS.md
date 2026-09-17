@@ -21,7 +21,8 @@
 - **매일·추억 (`src/care/Daily.ts`, `src/story/memories.ts`):** 연속 출석 보상(7일 주기), 날짜로 정해지는 오늘의 부탁 3개, 본 장면 다시 보기, 사진 앨범 12장(IndexedDB). 🎞️ 버튼.
 - **삐짐·질투·편지 (`src/story/away.ts`):** 친구 이상에서 24시간 넘게 비우면 삐짐, 호감 이상에서 다른 창을 30분~6시간 보면 질투. 삐지면 등을 돌리고, 쓰다듬기·딸기·꿀·대화·선물로 풀림. 6시간 넘게 비우면 편지와 간식 선물.
 - **미니게임 (`src/ui/MiniGames.ts`):** 살금살금 손 뻗기(다가오는 속도/거리² → LPLC2 루밍 입력, 진짜 Giant Fiber가 30 Hz를 넘으면 도망. 보정은 `scripts/loom-probe.ts`), 딸기 받기. 하트 보상은 하루 3판까지.
-- **외형:** 기본 VRM 소녀, 진짜 초파리 아바타(`src/body/FlyAvatar.ts`), 내 VRM 불러오기(IndexedDB).
+- **외형:** 기본 VRM 소녀, 실사 초파리(`src/body/RealFlyAvatar.ts`, flybody 모델 → `pipeline/build_fly_model.py` → `public/fly/fly.glb` 0.8 MB + `rig.json` 관절), 불러오기 실패 시 도형 초파리(`FlyAvatar.ts`), 내 VRM 불러오기(IndexedDB).
+  - 관절 방향(확인함): coxa + 뒤로 젖힘, femur + 접어 올림, tibia + 펴기, rostrum·haustellum − 주둥이 뻗기. 메시를 줄이면(fast-simplification) 얇은 껍질에 구멍이 나서 줄이지 않고 gltfpack으로 압축.
 - **뇌 표시·생체시계:** 핵심 뉴런 스파이크 래스터, pC1 설렘(설렘 수치로 직접 구동), 실제 시각으로 시계 뉴런 표시.
 - **데스크톱 앱 (`src-tauri/`, `src/desktop.ts`):** 아래 "데스크톱 앱" 절 참고.
 - **이스터에그:** 판정은 `src/story/EasterEggs.ts`, 연출은 `src/main.ts`의 `egg()`. 코나미·42번째 쓰다듬기·학명 이름·MN9 연타·4시 4분·특별한 날·딸기 요정(🍓 머리 장식)·초파리+쓴 버섯. 찾은 것은 `care.s.eggs`에 저장되고 하트는 처음 한 번만 줌.

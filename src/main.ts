@@ -2,6 +2,7 @@ import "./style.css";
 import { BEHAVIOR_LABEL, Controller } from "./behavior/Controller.ts";
 import { BodyScene } from "./body/BodyScene.ts";
 import { FlyAvatar } from "./body/FlyAvatar.ts";
+import { RealFlyAvatar } from "./body/RealFlyAvatar.ts";
 import { createFallbackRig, loadVrmRig } from "./body/Rig.ts";
 import { delBlob, getBlob, putBlob } from "./util/blobStore.ts";
 import { IS_DESKTOP, assetUrl, ensureAssets, fetchAsset } from "./util/assets.ts";
@@ -240,7 +241,14 @@ async function applyAvatar(kind: AvatarKind): Promise<boolean> {
   avatarLoading = true;
   try {
     if (body.hasAvatar(kind)) body.useAvatar(kind);
-    else if (kind === "fly") body.setRig(new FlyAvatar(), "fly");
+    else if (kind === "fly") {
+      // 실사 모델(flybody)을 못 불러오면 도형 초파리로
+      const fly = await RealFlyAvatar.load().catch((err) => {
+        console.warn("실사 초파리 로드 실패, 도형 초파리로 대체합니다:", err);
+        return new FlyAvatar();
+      });
+      body.setRig(fly, "fly");
+    }
     else if (kind === "custom") {
       const blob = await getBlob("custom-vrm");
       if (!blob) throw new Error("저장된 VRM 이 없어요");

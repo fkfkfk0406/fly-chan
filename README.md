@@ -10,6 +10,10 @@
 |---|---|---|
 | <img src="docs/images/brain.jpg" alt="뇌 패널" width="480"> | <img src="docs/images/mobile.jpg" alt="휴대폰 화면" width="180"> | <img src="docs/images/mobile-album.jpg" alt="출석과 오늘의 부탁" width="180"> |
 
+| 실사 초파리 모습 | 딸기를 먹는 중 (주둥이 뻗기) | 🤚 살금살금 손 뻗기 |
+|---|---|---|
+| <img src="docs/images/fly-talk.jpg" alt="실사 초파리 대화" width="320"> | <img src="docs/images/fly-feed.jpg" alt="실사 초파리 섭식" width="320"> | <img src="docs/images/game-reach.jpg" alt="손 뻗기 미니게임" width="320"> |
+
 ## 무엇을 할 수 있나요
 
 **돌보기**
@@ -25,7 +29,7 @@
 - 💖 하트: 함께 있을 때도, 자리를 비운 동안에도 모입니다. 상점에서 간식 재고, 꾸미기(리본·목도리·화분·액자), 선물을 삽니다.
 - 🎞️ 추억과 오늘: 연속 출석 보상, 날마다 바뀌는 오늘의 부탁 3개, 본 장면 다시 보기, 사진 앨범.
 - 📔 일기와 업적, 📷 사진(방 액자에 걸림).
-- 외형: 기본 VRM 소녀, 진짜 초파리 모습, 내 VRM 파일 불러오기.
+- 외형: 기본 VRM 소녀, **실사 초파리**(해부학 3D 모델의 몸 마디 66곳을 관절로 움직이고, 뇌 출력으로 삼각 보행·앞다리 그루밍·주둥이 뻗기·날갯짓), 내 VRM 파일 불러오기.
 
 **놀이**
 - 🤚 **살금살금 손 뻗기:** 손이 다가오는 속도가 실제 루밍 감지 뉴런(LPLC2) 입력이 됩니다. 너무 빨리 다가가면 진짜 Giant Fiber가 켜져서 도망가요. 가까울수록 같은 속도도 더 무섭게 느낍니다.
@@ -119,10 +123,10 @@ npm run release   # package.json 버전을 올려 커밋·태그(v0.1.1 …)를 
 | `src/behavior/Controller.ts` | 하강 뉴런 발화율 → 행동 (VNC 역할을 절차적으로 대신) |
 | `src/care/` | 돌봄 상태·관계 단계·하트·상점·업적, 출석·오늘의 부탁 |
 | `src/story/` | 대본, 연출 감독, 이름 조사 처리, 편지·삐짐, 추억, 이스터에그 |
-| `src/body/` | VRM 리그, 초파리 아바타, 애니메이션, 3D 방 |
+| `src/body/` | VRM 리그, 실사 초파리 아바타(`RealFlyAvatar.ts`), 애니메이션, 3D 방 |
 | `src/ui/`, `src/brain/`, `src/fx/` | 대화창·미니게임, 뇌 시각화·래스터, 파티클·효과음 |
 | `src-tauri/` | 데스크톱 앱 (창·트레이) |
-| `pipeline/` | 원본 데이터 → `public/data` 바이너리와 뉴런 그룹 |
+| `pipeline/` | 원본 데이터 → `public/data` 바이너리와 뉴런 그룹, flybody 모델 → `public/fly` |
 | `docs/PROGRESS.md` | 진행 상황과 다음 할 일 |
 
 ## 뇌 모델
@@ -153,4 +157,5 @@ Shiu et al. 2024 (Nature) Brian2 모델과 같은 방정식과 파라미터를 �
 
 - **FlyWire 커넥톰 v783:** Dorkenwald et al. 2024, Schlegel et al. 2024 (Nature). 연결 행렬은 [philshiu/Drosophila_brain_model](https://github.com/philshiu/Drosophila_brain_model), 주석·좌표는 [flyconnectome/flywire_annotations](https://github.com/flyconnectome/flywire_annotations)에서 받습니다.
 - **LIF 모델:** Shiu et al. 2024, *A Drosophila computational brain model reveals sensorimotor processing*, Nature.
+- **초파리 3D 모델:** [TuragaLab/flybody](https://github.com/TuragaLab/flybody) (Vaxenburg et al., Apache License 2.0). `pipeline/build_fly_model.py`로 GLB와 관절 정보로 변환했습니다(`public/fly/NOTICE.txt`).
 - **캐릭터:** pixiv `VRM1_Constraint_Twist_Sample` (VRM Public License 1.0: 사용·상업 이용·수정·재배포 허용). `public/models/fly-chan.vrm`을 다른 VRM으로 바꿔도 동작하고, 불러오지 못하면 도형 인형으로 대체합니다.

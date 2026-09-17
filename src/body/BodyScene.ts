@@ -5,7 +5,6 @@ import type { Mess } from "../care/Care.ts";
 import type { Expr } from "../story/scripts.ts";
 import { BED, CAMERA_HOME, ROOM_HALF, type Food } from "../world/Habitat.ts";
 import { Animator } from "./Animator.ts";
-import { FlyAvatar } from "./FlyAvatar.ts";
 import type { AccessoryAnchor, Rig } from "./Rig.ts";
 
 const WALL_H = 2.6;
@@ -204,7 +203,8 @@ export class BodyScene {
     if (!av) {
       // 꾸미기는 캐릭터를 방에 놓기 전에 만든다 (그래야 모델 좌표 그대로 붙는다)
       const body = this.buildBodyCosmetics(rig);
-      const animator = rig instanceof FlyAvatar ? rig : new Animator(rig);
+      // 초파리 아바타(도형·실사)는 스스로 움직이고, 사람 모양은 Animator 가 움직인다
+      const animator = (rig as Partial<AvatarAnimator> & { kind?: string }).kind === "fly" ? (rig as unknown as AvatarAnimator) : new Animator(rig);
       rig.object.traverse((o) => (o.castShadow = true));
       av = { rig, animator, body };
       this.avatars.set(key, av);

@@ -1,0 +1,2 @@
+초파리 3D 모델: flybody (https://github.com/TuragaLab/flybody), Apache License 2.0.
+원본 fruitfly.xml 과 OBJ 메시를 pipeline/build_fly_model.py 로 GLB(meshopt 압축)와 rig.json 으로 변환했습니다.
