@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { BodyState } from "../behavior/Controller.ts";
 import type { Expr } from "../story/scripts.ts";
-import type { BoneName, ExpressionName, Rig } from "./Rig.ts";
+import type { AccessoryAnchor, BoneName, ExpressionName, Rig } from "./Rig.ts";
 
 type Side = 1 | -1;
 
@@ -139,8 +139,16 @@ export class FlyAvatar implements Rig {
     return undefined;
   }
 
-  attachNode(name: "head" | "upperChest"): THREE.Object3D | undefined {
-    return name === "head" ? this.head : this.thorax;
+  attachNode(name: "head" | "neck" | "upperChest"): THREE.Object3D | undefined {
+    return name === "upperChest" ? this.thorax : this.head;
+  }
+
+  /** 리본은 더듬이 옆 정수리, 목도리는 머리와 가슴 사이 */
+  accessoryAnchors(): Record<"ribbon" | "scarf", AccessoryAnchor> {
+    return {
+      ribbon: { node: this.head, position: new THREE.Vector3(0.11, 0.47, 0.25), rotation: new THREE.Euler(0, 0.4, -0.35), scale: 1.1 },
+      scarf: { node: this.thorax, position: new THREE.Vector3(0, 0.36, 0.13), rotation: new THREE.Euler(1.35, 0, 0), scale: 1.65 },
+    };
   }
 
   setExpression(_name: ExpressionName, _weight: number): void {}

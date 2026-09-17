@@ -9,6 +9,13 @@ export const BONES = [
 ] as const;
 export type BoneName = (typeof BONES)[number];
 
+export interface AccessoryAnchor {
+  node: THREE.Object3D | undefined;
+  position: THREE.Vector3;
+  rotation: THREE.Euler;
+  scale: number;
+}
+
 export type ExpressionName = "aa" | "happy" | "surprised" | "relaxed" | "blink" | "sad" | "angry";
 
 /**
@@ -23,7 +30,9 @@ export interface Rig {
   readonly height: number;
   bone(name: BoneName): THREE.Object3D | undefined;
   /** 액세서리를 붙일 실제 렌더 노드 */
-  attachNode(name: "head" | "upperChest"): THREE.Object3D | undefined;
+  attachNode(name: "head" | "neck" | "upperChest"): THREE.Object3D | undefined;
+  /** 액세서리를 붙일 자리 (없으면 사람 비율로 계산). 좌표·회전은 모델 공간 */
+  accessoryAnchors?(): Record<"ribbon" | "scarf", AccessoryAnchor>;
   setExpression(name: ExpressionName, weight: number): void;
   update(dt: number): void;
 }
