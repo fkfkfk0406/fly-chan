@@ -158,7 +158,7 @@ button {
   border-radius: 16px;
   font-size: 12px;
 }
-.dock span { font-size: 22px; line-height: 1; }
+.dock button > span:first-child { font-size: 22px; line-height: 1; }
 .dock em { font-style: normal; }
 .dock button:hover, .dock button[aria-expanded="true"] { background: var(--accent-soft); }
 .dock button:active { transform: scale(0.95); }
@@ -387,7 +387,7 @@ body.flash::after {
   .hud-buttons { gap: 6px; }
   .dock { gap: 2px; padding: 6px; }
   .dock > button, .prank > button { min-width: 46px; padding: 6px 2px; font-size: 11px; }
-  .dock span { font-size: 20px; }
+  .dock button > span:first-child { font-size: 20px; }
   .dialog-text { font-size: 15px; }
   .drawer { top: auto; height: 78vh; width: 100vw; border-radius: 20px 20px 0 0; --slide: 0; animation-name: rise; }
   .drawer.diary, .drawer.brain, .drawer.shop, .drawer.album { left: 0; right: 0; border: 0; }
