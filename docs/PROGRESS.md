@@ -62,7 +62,10 @@
 - **Tauri 추천** (설치 5~10 MB, OS 웹뷰 사용). Electron은 150 MB 이상이라 상주 앱에는 부담.
 - 360×640 작은 창, 프레임 없음, 항상 위, 드래그 이동, 트레이 상주, 자동 시작 옵션.
 - 창을 숨기면 뇌 시뮬을 멈추고 돌아올 때 경과 시간만 반영(오프라인 계산은 이미 있음).
-- 뇌 데이터 91 MB: 설치 파일에 포함할지 첫 실행 때 받을지 결정 필요.
+- **결정 (2026-09-17): Tauri + 뇌 데이터는 첫 실행 때 GitHub Releases에서 받기.** VRM(`public/models/onna.vrm`, 10 MB, git 제외)도 Releases에 함께 올린다. 올리기 전에 확인받기.
+  - 먼저 Rust 설치: `winget install --id Rustlang.Rustup -e --interactive` (`--silent`는 실패했음). VS 2022 C++ 도구·WebView2 필요.
+  - tauri-plugin-http로 받아 Cache Storage에 저장하고, 워커·main의 `data/` 요청을 캐시 우선으로. Tauri 빌드 결과물에서 `public/data`는 뺀다.
+  - 닫기 = 트레이로 숨김, 두 번 실행 방지. 데스크톱에서는 질투 이벤트(창 숨김 30분)를 끄고, 숨긴 동안 흐른 시간을 복귀 때 반영(지금은 창이 숨겨지면 게임 시간이 멈춤).
 - 저장은 `localStorage` → 사용자 폴더 JSON 파일로 바꾸는 것이 안전.
 - 순서: 껍데기 → 창 설정 → 트레이·시뮬 정지 → 저장·데이터 → 알림.
 
