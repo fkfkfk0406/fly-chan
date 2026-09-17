@@ -135,6 +135,10 @@ export interface CareState {
   unlocked: string[];
   /** 외형: 기본 미소녀 VRM, 진짜 초파리, 사용자가 불러온 VRM */
   avatar: "girl" | "fly" | "custom";
+  /** 찾은 이스터에그 id, 딸기 연속 횟수, 이스터에그로 얻은 칭호 */
+  eggs: string[];
+  sweetStreak: number;
+  title: string;
   /** 마지막으로 찍은 사진 (액자에 걸린다) */
   photo: string;
   /** 하트: 상점 재화 */
@@ -214,7 +218,7 @@ export class Care {
       name: "", callMe: "", introDone: false,
       stageSeen: 0, gameHours: 0, gainDay: 0, gainToday: 0,
       totals: { meals: 0, pets: 0, cleans: 0, talks: 0, sleeps: 0, scares: 0, grooms: 0, photos: 0 },
-      unlocked: [], photo: "", avatar: "girl",
+      unlocked: [], photo: "", avatar: "girl", eggs: [], sweetStreak: 0, title: "",
       hearts: 20, pendingHearts: 0, stock: { sweet: 3, honey: 0, water: 2, salty: 0, bitter: 1 },
       owned: [], giftDay: -1, heartsToday: 0,
       greetedDay: "", today: emptyToday(now), recentTalks: [], tastes: {},
@@ -325,6 +329,15 @@ export class Care {
       got.push(a);
     }
     return got;
+  }
+
+  /** 이스터에그를 처음 찾았으면 하트를 주고 true */
+  findEgg(id: string, now: number, reward: number, note: string): boolean {
+    if (this.s.eggs.includes(id)) return false;
+    this.s.eggs.push(id);
+    this.s.hearts += reward;
+    this.log(now, `🥚 이스터에그 발견: ${note} (+${reward} 하트)`);
+    return true;
   }
 
   /** 기다리는 동안 모은 하트를 받는다. 받은 개수를 돌려준다 */

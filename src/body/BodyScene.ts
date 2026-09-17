@@ -296,6 +296,22 @@ export class BodyScene {
     }
     this.attachAt(scarf, anchors.scarf);
     items.set("scarf", scarf);
+
+    // 🍓 딸기 요정(이스터에그): 리본 반대쪽에 작은 딸기
+    const berry = new THREE.Group();
+    const fruit = new THREE.Mesh(new THREE.SphereGeometry(0.03, 14, 10), toon(0xe63950));
+    fruit.scale.set(1, 1.2, 1);
+    const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.024, 0.016, 6), toon(0x4f9d57));
+    leaf.position.y = 0.036;
+    leaf.rotation.x = Math.PI;
+    berry.add(fruit, leaf);
+    const r = anchors.ribbon;
+    this.attachAt(berry, {
+      ...r,
+      position: new THREE.Vector3(-r.position.x, r.position.y, r.position.z),
+      rotation: new THREE.Euler(r.rotation.x, -r.rotation.y, -r.rotation.z),
+    });
+    items.set("berryhat", berry);
     return items;
   }
 

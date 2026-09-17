@@ -15,6 +15,7 @@ import { mutter } from "./story/scripts.ts";
 import { burst } from "./fx/Hearts.ts";
 import { Sfx } from "./fx/Sfx.ts";
 import { Director } from "./story/Director.ts";
+import { KonamiDetector, SCIENTIFIC_NAME_SCENE, is404, isScientificName, specialDay } from "./story/EasterEggs.ts";
 import { DialogBox } from "./ui/DialogBox.ts";
 import { MOTOR_GROUPS, SENSORY_GROUPS, type Meta, type MotorGroup, type SensoryGroup } from "./sim/data.ts";
 import { NO_ADAPTATION } from "./sim/lif-engine.ts";
@@ -85,6 +86,18 @@ function say(text: string | null, seconds = 2.2, silent = false) {
   bubbleUntil = performance.now() / 1000 + seconds;
 }
 
+/** 몸에 걸칠 것: 산 꾸미기 + 이스터에그 장식 */
+const worn = () => (care.s.title ? [...care.s.owned, "berryhat"] : care.s.owned);
+
+/** 이스터에그: 대사는 매번, 하트 보상과 일기는 처음 한 번만 */
+function egg(id: string, reward: number, note: string, line?: string) {
+  if (line) say(line, 4);
+  if (care.findEgg(id, Date.now(), reward, note)) {
+    sfx.levelUp();
+    burst(innerWidth / 2, innerHeight * 0.42, 10, ["🥚", "✨", "💖"]);
+  }
+}
+
 /** 새로 달성한 업적을 알린다 */
 function celebrate(list: Achievement[]) {
   list.forEach((a, k) =>
@@ -105,6 +118,12 @@ controller.onEvent = (e) => {
     case "ate": {
       earn(2);
       rec("meals");
+      care.s.sweetStreak = (controller.eatingKind ?? "sweet") === "sweet" ? care.s.sweetStreak + 1 : 0;
+      if (care.s.sweetStreak >= 10 && !care.s.title) {
+        care.s.title = "딸기 요정";
+        body.setCosmetics(worn());
+        egg("berry-fairy", 30, "딸기 연속 10개", "딸기 10개 연속…! 오늘부터 난 🍓딸기 요정이야!");
+      }
       sfx.chew();
       burst(at.x, at.y, 2, ["♪"]);
       const kind = controller.eatingKind ?? "sweet";
@@ -121,6 +140,9 @@ controller.onEvent = (e) => {
       burst(at.x, at.y, 3, ["!", "💦"]);
       break;
     case "bitter":
+      sfx.sad();
+      if (care.s.avatar === "fly") egg("fly-bitter", 10, "초파리 모습으로 쓴 버섯", "초파리여도 쓴 건 싫거든?");
+      break;
     case "woken":
       sfx.sad();
       break;
@@ -213,7 +235,7 @@ async function applyAvatar(kind: AvatarKind): Promise<boolean> {
       body.setRig(rig, "girl");
     }
     care.s.avatar = kind;
-    body.setCosmetics(care.s.owned); // 산 꾸미기 아이템 복원
+    body.setCosmetics(worn()); // 산 꾸미기 아이템 복원
     if (care.s.photo) body.setPhoto(care.s.photo);
     return true;
   } catch (err) {
@@ -250,6 +272,17 @@ for (const g of MOTOR_GROUPS) {
   row.innerHTML = `<span class="name">${MOTOR_LABEL[g][0]}</span><span class="track"><span class="fill"></span></span><span class="val">0 Hz</span>`;
   $("meters").appendChild(row);
   meterEls.set(g, { row, fill: row.querySelector(".fill")!, val: row.querySelector(".val")! });
+  if (g === "feed") {
+    let taps: number[] = [];
+    row.addEventListener("click", () => {
+      const t = performance.now();
+      taps = [...taps.filter((x) => t - x < 3000), t];
+      if (taps.length >= 5) {
+        taps = [];
+        egg("mn9", 15, "MN9 연타", "MN9 그만 눌러… 배고파지잖아!");
+      }
+    });
+  }
 }
 const stimEls = new Map<SensoryGroup, HTMLElement>();
 for (const g of SENSORY_GROUPS) {
@@ -334,8 +367,21 @@ function wakeUp() {
     say(`기다리면서 하트 ${got}개 모았어!`, 3);
     setTimeout(() => burst(innerWidth / 2, innerHeight * 0.5, Math.min(10, got), ["💖"]), 400);
   }
+  const now = new Date();
   if (care.s.asleep) say("💤", 2, true);
-  else director.greetIfNeeded(Date.now());
+  else if (is404(now)) {
+    egg("404", 44, "새벽 4시 4분", "404… 뇌를 찾을 수 없어요… zzZ");
+    setTimeout(() => director.greetIfNeeded(Date.now()), 4000);
+  } else director.greetIfNeeded(Date.now());
+  const special = specialDay(now, care.daysTogether());
+  if (special && !care.s.eggs.includes(special.id)) {
+    director.queueScene(special.scene);
+    egg(special.id, special.reward, special.scene.id === "xmas" ? "크리스마스" : special.scene.id === "pi" ? "파이데이" : `함께한 지 ${care.daysTogether()}일`);
+  }
+  if (isScientificName(care.s.name) && !care.s.eggs.includes("name")) {
+    director.queueScene(SCIENTIFIC_NAME_SCENE);
+    egg("name", 20, "학명으로 이름 짓기");
+  }
 }
 
 function showNaming() {
@@ -399,6 +445,10 @@ function pet() {
     earn(1);
     care.thrillUp(0.2 + 0.3 * care.s.affection);
     rec("pets");
+    if (care.s.totals.pets === 42) {
+      egg("pet-42", 42, "42번째 쓰다듬기", "삶, 우주, 그리고 모든 것의 답… 42번째 쓰다듬기야!");
+      burst(innerWidth / 2, innerHeight * 0.45, 20, ["💖"]);
+    }
   }
   if (line !== "그만~") {
     sfx.pet();
@@ -546,7 +596,14 @@ $("btn-restart").onclick = () => {
 };
 updateLightButton();
 
+const konami = new KonamiDetector();
 window.addEventListener("keydown", (e) => {
+  if (konami.push(e.key) && ready) {
+    togglePanel("brain-panel", true);
+    setTimeout(() => neural?.flash(), 400);
+    egg("konami", 30, "코나미 커맨드", "지금 내 뉴런… 13만 8천 개 다 켜졌어?!");
+    return;
+  }
   if (dialog.open) return;
   if (e.key === "Escape") {
     togglePanel("brain-panel", false);
@@ -689,7 +746,7 @@ function renderShop() {
       return shopItem(item.emoji, item.label, `${item.note} · 하트 적립 +${Math.round(item.bonus * 100)}%`, owned ? null : item.price, owned || hearts < item.price, () => {
         if (care.buyCosmetic(id, Date.now())) {
           sfx.sparkle();
-          body.setCosmetics(care.s.owned);
+          body.setCosmetics(worn());
           const at = anchor();
           burst(at.x, at.y, 5, ["✨"]);
         }
@@ -744,7 +801,7 @@ function updateUi() {
   setGauge("g-love", s.affection);
   $("days").textContent = `함께한 지 ${care.daysTogether()}일`;
   $("heart-count").textContent = String(Math.floor(care.s.hearts));
-  $("stage").textContent = `💞 ${STAGES[care.s.stageSeen].name}`;
+  $("stage").textContent = `💞 ${STAGES[care.s.stageSeen].name}${care.s.title ? ` · 🍓${care.s.title}` : ""}`;
 
   const state = controller.state;
   const label = BEHAVIOR_LABEL[Controller.displayBehavior(state)];

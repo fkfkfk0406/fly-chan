@@ -124,7 +124,17 @@ export class NeuralField {
     this.controls.autoRotate = on;
   }
 
+  private flashUntil = 0;
+
+  /** 모든 뉴런을 잠깐 최대 밝기로 (코나미 커맨드) */
+  flash(ms = 1500): void {
+    (this.activity.array as Uint8Array).fill(255);
+    this.activity.needsUpdate = true;
+    this.flashUntil = performance.now() + ms;
+  }
+
   setActivity(values: Uint8Array): void {
+    if (performance.now() < this.flashUntil) return;
     (this.activity.array as Uint8Array).set(values);
     this.activity.needsUpdate = true;
   }

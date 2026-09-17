@@ -29,6 +29,11 @@ export class Director {
     this.care.awayHours = 0;
   }
 
+  /** 이스터에그 같은 특별 장면을 대기열에 넣는다 */
+  queueScene(scene: Scene): void {
+    this.queue.push(scene);
+  }
+
   /** 말 걸기 */
   talk(now: number): void {
     if (this.dialog.open) return;
