@@ -105,12 +105,12 @@ button {
 .hud-buttons { margin-left: auto; display: flex; gap: 8px; }
 .profile b { font-weight: 600; color: var(--accent); }
 .round {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: var(--card);
   backdrop-filter: blur(8px);
-  font-size: 20px;
+  font-size: 16px;
 }
 
 /* 행동 한 줄 */
@@ -299,10 +299,10 @@ body.talking .dock, body.talking .status, body.talking .bubble { display: none; 
 /* 상점 */
 .hearts { padding: 0 4px 0 8px; gap: 5px; display: flex; align-items: center; font-size: 15px; }
 .shop-btn {
-  display: flex; align-items: center; gap: 4px; height: 44px; padding: 0 14px 0 11px; border-radius: 99px;
-  background: var(--card); backdrop-filter: blur(8px); font-size: 13px; font-weight: 700; color: var(--accent);
+  display: flex; align-items: center; gap: 4px; height: 36px; padding: 0 12px 0 9px; border-radius: 99px;
+  background: var(--card); backdrop-filter: blur(8px); font-size: 12px; font-weight: 700; color: var(--accent);
 }
-.shop-btn span { font-size: 18px; }
+.shop-btn > span:first-child { font-size: 15px; }
 .hud-buttons > * { flex-shrink: 0; white-space: nowrap; }
 .hearts b { font-variant-numeric: tabular-nums; }
 .drawer.shop { left: 0; background: #fffafb; border-right: 1px solid var(--line); --slide: -40px; }
@@ -382,8 +382,9 @@ body.flash::after {
   .gauges li { padding: 2px 3px; gap: 3px; }
   .gauges .label { display: none; }
   .bar { width: 28px; }
-  .round { width: 40px; height: 40px; }
-  .shop-btn { height: 40px; padding: 0 11px 0 9px; }
+  .round { width: 32px; height: 32px; font-size: 15px; }
+  .shop-btn { height: 32px; padding: 0 10px 0 8px; }
+  .hearts { font-size: 13px; }
   .hud-buttons { gap: 6px; }
   .dock { gap: 2px; padding: 6px; }
   .dock > button, .prank > button { min-width: 46px; padding: 6px 2px; font-size: 11px; }
