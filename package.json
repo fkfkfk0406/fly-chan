@@ -1,7 +1,7 @@
 {
   "name": "fly-chan",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "scripts": {
     "data": "pipeline/.venv/Scripts/python pipeline/fetch_data.py && pipeline/.venv/Scripts/python pipeline/build_connectome.py",
