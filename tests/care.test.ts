@@ -247,3 +247,51 @@ describe("Care 하트와 상점", () => {
     expect(care.earnHearts(2)).toBe(2);
   });
 });
+
+describe("Care 업적", () => {
+  beforeEach(() => store.clear());
+
+  it("기록이 조건을 채우면 업적을 한 번만 주고 하트를 보상한다", () => {
+    const care = Care.load(0);
+    const hearts = care.s.hearts;
+    const got = care.record("meals", 0);
+    expect(got.map((a) => a.id)).toContain("first-meal");
+    expect(care.s.hearts).toBe(hearts + got.reduce((n, a) => n + a.reward, 0));
+    expect(care.record("meals", 0)).toEqual([]); // 두 번 주지 않는다
+    expect(care.s.diary[0].text).toContain("업적 달성");
+  });
+
+  it("누적 개수가 차야 달성되고, amount 0 으로 확인만 할 수 있다", () => {
+    const care = Care.load(0);
+    for (let k = 0; k < 19; k++) care.record("cleans", 0);
+    expect(care.s.unlocked).not.toContain("cleaner");
+    expect(care.record("cleans", 0).map((a) => a.id)).toContain("cleaner");
+    care.s.gameHours = 24 * 6;
+    expect(care.record("photos", 0, 0).map((a) => a.id)).toContain("week");
+  });
+
+  it("꾸미기를 살수록 하트 적립 배수가 오른다", () => {
+    const care = Care.load(0);
+    expect(care.heartBonus).toBe(1);
+    care.s.owned = ["plant", "frame"];
+    expect(care.heartBonus).toBeCloseTo(1.25, 5);
+  });
+});
+
+describe("Care 설렘", () => {
+  beforeEach(() => store.clear());
+
+  it("이벤트로 치솟고, 애정·기분이 정하는 기본값으로 가라앉는다", () => {
+    const care = Care.load(0);
+    care.s.affection = 0.05;
+    care.thrillUp(0.9);
+    expect(care.thrill).toBeCloseTo(0.9, 5);
+    for (let k = 0; k < 60; k++) care.passTime(1);
+    expect(care.thrill).toBeLessThan(0.05); // 낯섦이면 금방 식는다
+    const close = Care.load(0);
+    close.s.affection = 0.9;
+    close.s.mood = 1;
+    for (let k = 0; k < 60; k++) close.passTime(1);
+    expect(close.thrill).toBeGreaterThan(0.5); // 연인이고 기분 좋으면 늘 두근두근
+  });
+});

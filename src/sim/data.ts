@@ -1,7 +1,7 @@
 import type { Connectome, LifParams } from "./lif-engine.ts";
 
 export type GroupName =
-  | "sugar" | "bitter" | "water" | "pharynx_sugar" | "ir94e" | "jo_touch" | "looming" | "light"
+  | "sugar" | "bitter" | "water" | "pharynx_sugar" | "ir94e" | "jo_touch" | "looming" | "light" | "pc1"
   | "forward" | "backward" | "turn_left" | "turn_right" | "escape" | "groom" | "feed";
 
 export type Groups = Record<GroupName, number[]>;
@@ -16,7 +16,7 @@ export interface Meta {
 }
 
 export const SENSORY_GROUPS = [
-  "sugar", "bitter", "water", "pharynx_sugar", "ir94e", "jo_touch", "looming", "light",
+  "sugar", "bitter", "water", "pharynx_sugar", "ir94e", "jo_touch", "looming", "light", "pc1",
 ] as const satisfies readonly GroupName[];
 
 export const MOTOR_GROUPS = [

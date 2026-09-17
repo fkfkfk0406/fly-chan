@@ -38,6 +38,9 @@ export class BodyScene {
   private rig?: Rig;
   private readonly cosmetics = new Map<string, THREE.Object3D>();
   private ownedCosmetics: string[] = [];
+  private framePicture?: THREE.Mesh;
+  private frameHeart?: THREE.Object3D;
+  private pendingPhoto = "";
   private focus = false;
   private returning = false;
   private readonly savedOffset = new THREE.Vector3();
@@ -183,6 +186,28 @@ export class BodyScene {
     this.setCosmetics(this.ownedCosmetics);
   }
 
+  /** 지금 화면을 PNG 데이터 URL 로 (렌더 직후 같은 틱에서 읽어야 비어 있지 않다) */
+  capture(): string {
+    this.renderer.render(this.scene, this.camera);
+    return this.renderer.domElement.toDataURL("image/png");
+  }
+
+  /** 액자에 사진을 건다 */
+  setPhoto(url: string): void {
+    this.pendingPhoto = url;
+    const picture = this.framePicture;
+    if (!picture || !url) return;
+    new THREE.TextureLoader().load(url, (tex) => {
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const mat = picture.material as THREE.MeshBasicMaterial;
+      mat.map?.dispose();
+      mat.map = tex;
+      mat.needsUpdate = true;
+      picture.visible = true;
+      if (this.frameHeart) this.frameHeart.visible = false;
+    });
+  }
+
   /** 상점에서 산 꾸미기 아이템만 보이게 한다 */
   setCosmetics(owned: readonly string[]): void {
     this.ownedCosmetics = [...owned];
@@ -244,6 +269,15 @@ export class BodyScene {
     heart.position.set(0.06, 0, 0);
     heart.scale.set(0.4, 1, 1);
     frame.add(border, photo, heart);
+    // 사진을 찍으면 액자에 걸린다 (방 안쪽 +X 를 보도록)
+    const picture = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.34), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    picture.rotation.y = Math.PI / 2;
+    picture.position.x = 0.052;
+    picture.visible = false;
+    frame.add(picture);
+    this.framePicture = picture;
+    this.frameHeart = heart;
+    if (this.pendingPhoto) this.setPhoto(this.pendingPhoto);
     frame.position.set(-ROOM_HALF + 0.08, 1.5, -0.6);
     this.scene.add(frame);
     this.cosmetics.set("frame", frame);

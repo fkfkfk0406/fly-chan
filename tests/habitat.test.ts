@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EAT_SECONDS, Habitat, SNACKS, type FoodKind } from "../src/world/Habitat.ts";
+import { EAT_SECONDS, Habitat, PC1_MAX_HZ, SNACKS, type FoodKind } from "../src/world/Habitat.ts";
 
 describe("Habitat 감각 입력", () => {
   const atWall = { x: 2.8, z: 0, heading: Math.PI / 2 };
@@ -82,5 +82,16 @@ describe("간식별 미각 뉴런", () => {
     const h2 = new Habitat();
     h2.addFood("sweet", 0, 0);
     expect(h2.sense(at(0), 0, 0, false).sugar).toBeCloseTo(SNACKS.sweet.rate * 0.25, 5);
+  });
+});
+
+describe("설렘 → pC1", () => {
+  it("설렘에 비례해 pC1 을 자극하고, 자는 동안은 0", () => {
+    const h = new Habitat();
+    const pose = { x: 0, z: 0, heading: 0 };
+    expect(h.sense(pose, 0, 0.5, false, 0).pc1).toBe(0);
+    expect(h.sense(pose, 0, 0.5, false, 0.5).pc1).toBeCloseTo(PC1_MAX_HZ / 2, 5);
+    expect(h.sense(pose, 0, 0.5, false, 3).pc1).toBe(PC1_MAX_HZ); // 상한
+    expect(h.sense(pose, 0, 0.5, true, 1).pc1).toBe(0);
   });
 });

@@ -285,6 +285,7 @@ body.talking .dock, body.talking .status, body.talking .bubble { display: none; 
 .meter .val { text-align: right; font-variant-numeric: tabular-nums; color: var(--dark-muted); }
 .meter.on .val { color: var(--dark-ink); }
 
+.raster { width: 100%; display: block; }
 .stim { display: flex; flex-wrap: wrap; gap: 4px; }
 .stim span { font-size: 11px; border: 1px solid var(--dark-line); border-radius: 99px; padding: 2px 9px; color: var(--dark-muted); }
 .stim span.on { color: var(--dark-ink); border-color: #6b4a63; background: #2a1d2b; }
@@ -319,6 +320,25 @@ body.talking .dock, body.talking .status, body.talking .bubble { display: none; 
 .shop-item .name { display: grid; }
 .shop-item .name small { color: var(--muted); font-size: 11px; }
 .shop-item .price { font-weight: 700; color: var(--accent); white-space: nowrap; }
+
+/* 사진 셔터 */
+body.flash::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: #fff;
+  pointer-events: none;
+  animation: shutter 0.35s ease-out forwards;
+}
+@keyframes shutter { from { opacity: 0.85; } to { opacity: 0; } }
+
+/* 업적 */
+.achievements { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.achievements li { display: grid; grid-template-columns: 24px 1fr auto; gap: 8px; align-items: center; font-size: 12px; }
+.achievements li.locked { color: var(--muted); }
+.achievements li.locked .emoji { filter: grayscale(1); opacity: 0.5; }
+.achievements small { color: var(--muted); }
 
 /* 일기 */
 .entries { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }

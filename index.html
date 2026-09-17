@@ -24,6 +24,7 @@
       </ul>
       <div class="hud-buttons">
         <button id="btn-shop" class="hearts" aria-label="상점 열기"><span aria-hidden="true">💖</span><b id="heart-count">0</b></button>
+        <button id="btn-photo" class="round" aria-label="사진 찍기">📷</button>
         <button id="btn-mute" class="round" aria-label="소리 끄기">🔊</button>
         <button id="btn-diary" class="round" aria-label="일기">📔</button>
       </div>
@@ -81,6 +82,8 @@
         </dl>
         <h3>하강·운동 뉴런 <small>0–150 Hz</small></h3>
         <div class="meters" id="meters"></div>
+        <h3>핵심 뉴런 스파이크 <small>최근 6초 · 막전위</small></h3>
+        <canvas class="raster" id="raster"></canvas>
         <h3>지금 들어오는 감각</h3>
         <div class="stim" id="stim"></div>
         <p class="top-dn" id="top-dn">&nbsp;</p>

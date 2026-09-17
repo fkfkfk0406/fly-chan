@@ -194,6 +194,8 @@ export class Care {
   private petTimes: number[] = [];
   /** 자리를 비운 시간을 흘려보내는 중인지 (하트가 pendingHearts 로 쌓인다) */
   private offline = false;
+  /** 설렘 0-1. 저장하지 않는 순간 상태로, 애정·기분이 높으면 기본값이 오르고 이벤트로 치솟는다 */
+  thrill = 0;
   /** 이번에 열었을 때 닫혀 있던 시간 (게임 시간, h) */
   awayHours = 0;
 
@@ -285,12 +287,21 @@ export class Care {
       this.addMess("dust");
     }
 
+    // 설렘은 애정·기분이 높을 때의 기본값으로 10초에 걸쳐 가라앉는다
+    const calm = clamp01((s.affection - 0.35) * 1.5) * clamp01((s.mood - 0.5) * 2);
+    this.thrill += (calm - this.thrill) * (1 - Math.exp(-realSec / 10));
+
     // 기분은 애정·배고픔·졸림·청결이 정하는 기준값으로 천천히(τ 2분) 돌아간다
     const target = clamp01(
       0.5 + 0.35 * (s.affection - 0.5) - 0.45 * Math.max(0, s.hunger - 0.6) -
         0.35 * Math.max(0, s.sleepiness - 0.75) - 0.3 * Math.max(0, 0.7 - this.cleanliness),
     );
     s.mood += (target - s.mood) * (1 - Math.exp(-realSec / 120));
+  }
+
+  /** 설렘을 순간적으로 올린다 */
+  thrillUp(amount: number): void {
+    this.thrill = clamp01(this.thrill + amount);
   }
 
   /** 꾸미기 아이템이 올려 주는 하트 적립 배수 */

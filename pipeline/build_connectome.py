@@ -111,6 +111,10 @@ def build_groups(ann: pd.DataFrame, index_of: dict) -> dict:
         "pharynx_water": pick(ct.isin(["PhG3", "PhG4"])),
         # 다리(VNC) 미각 상행 뉴런 SA_VTV: 감각 종류 불명 (탐색용)
         "leg_taste": pick((cls == "gustatory") & (sub == "SA_VTV_pro_meso_meta")),
+        # 청각 JO (JO-A/B): 소리·노래. 암컷 pC1 은 수컷의 노래로 켜진다고 알려져 있다 — scripts/pc1-probe.ts
+        "jo_song": pick(sub == "auditory"),
+        # 내부 상태: pC1a~e (각성·짝짓기 상태를 정하는 뉴런, 암컷에서는 수용성·공격성) — scripts/pc1-probe.ts
+        "pc1": pick(ct.str.match(r"^pC1[a-e]$")),
         # 운동 출력
         "forward": pick(ct == "DNp09"),  # P9
         "backward": pick(ct == "MDN"),  # moonwalker

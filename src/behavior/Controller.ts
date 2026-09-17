@@ -278,6 +278,13 @@ export class Controller {
       // DN 직접 기여: P9·MDN 은 속도, DNa01/02 좌우 차이는 회전
       targetSpeed += clamp((r.forward - r.backward) * 0.015, -0.8, 0.8);
       targetTurn += clamp((r.turn_left - r.turn_right) * 0.05, -2, 2);
+      // 좌우 회전 DN 이 같이 켜지면(주로 pC1 설렘) 제자리에서 몸을 좌우로 흔든다
+      const turnSum = r.turn_left + r.turn_right;
+      const fidget = clamp((turnSum - 10) / 30, 0, 1);
+      if (fidget > 0 && Math.abs(targetSpeed) < 0.25) {
+        targetTurn += Math.sin(now * 5) * 2.4 * fidget;
+        if (fidget > 0.3) s.cause = `pC1 설렘 → 회전 DN ${turnSum.toFixed(0)} Hz (안절부절)`;
+      }
     }
 
     s.elev += (targetElev - s.elev) * (1 - Math.exp(-dt * 6));

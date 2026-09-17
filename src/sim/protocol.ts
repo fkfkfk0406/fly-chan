@@ -24,12 +24,14 @@ export interface SimFrame {
   motor: Record<MotorGroup, number>;
   /** 가장 활발한 하강·운동 뉴런 [이름, Hz] */
   topLabeled: [string, number][];
+  /** 핵심 뉴런별 이번 프레임의 스파이크 시각(시뮬 ms)과 현재 막전위(mV) */
+  probes: { spikes: number[][]; v: number[] };
   /** 뉴런별 시각화 밝기 0-255 */
   activity: Uint8Array;
 }
 
 export type FromWorker =
   | { type: "progress"; loaded: number; total: number; label: string }
-  | { type: "ready"; meta: Meta; groupSizes: Record<string, number> }
+  | { type: "ready"; meta: Meta; groupSizes: Record<string, number>; probeNames: string[] }
   | SimFrame
   | { type: "error"; message: string };

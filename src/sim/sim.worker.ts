@@ -25,6 +25,15 @@ let lastWall = 0;
 let debt = 0;
 let speedEma = 1;
 
+// 인스펙터에 보여 줄 핵심 뉴런: 그룹마다 대표 뉴런 하나
+const PROBES: [string, keyof Groups][] = [
+  ["당 GRN", "sugar"], ["쓴맛 GRN", "bitter"], ["물 GRN", "water"], ["JO-F 접촉", "jo_touch"], ["LPLC2 루밍", "looming"],
+  ["pC1 설렘", "pc1"], ["MN9 섭식", "feed"], ["Giant Fiber", "escape"], ["그루밍 DN", "groom"], ["DNa 좌회전", "turn_left"], ["P9 전진", "forward"],
+];
+let probeIdx: number[] = [];
+let probeSeen: number[] = [];
+let probeTimes: number[][] = [];
+
 async function fetchBuffer(name: string, loaded: { bytes: number; total: number }): Promise<ArrayBuffer> {
   const res = await fetch(`${import.meta.env.BASE_URL}data/${name}`);
   if (!res.ok || !res.body) throw new Error(`${name} 을 불러오지 못했습니다 (${res.status}). npm run data 를 먼저 실행하세요.`);
@@ -67,7 +76,10 @@ async function init(dt: number, adaptation: Adaptation) {
   engine = new LifEngine(parseConnectome(meta, buffers), meta.lif, dt, (Math.random() * 2 ** 31) | 0, adaptation);
   trace = new Float32Array(meta.neurons);
   const groupSizes = Object.fromEntries(Object.entries(groups).map(([k, v]) => [k, v.length]));
-  post({ type: "ready", meta, groupSizes });
+  probeIdx = PROBES.map(([, g]) => groups[g][0]);
+  probeSeen = probeIdx.map(() => 0);
+  probeTimes = probeIdx.map(() => []);
+  post({ type: "ready", meta, groupSizes, probeNames: PROBES.map(([name]) => name) });
   lastWall = performance.now();
   loop();
 }
@@ -83,6 +95,14 @@ function loop() {
     const chunk = Math.max(1, Math.round(1 / engine.dt)); // ≈1 ms 단위로 끊어 예산 확인
     while (debt >= engine.dt * chunk && performance.now() - frameStart < BUDGET_MS) {
       engine.run(chunk);
+      const t = engine.step * engine.dt;
+      for (let k = 0; k < probeIdx.length; k++) {
+        const c = engine.spikeCount[probeIdx[k]];
+        if (c > probeSeen[k]) {
+          probeTimes[k].push(t);
+          probeSeen[k] = c;
+        }
+      }
       debt -= engine.dt * chunk;
     }
   }
@@ -129,6 +149,9 @@ function sendFrame(simDelta: number) {
     topLabeled.sort((a, b) => b[1] - a[1]).splice(6);
   }
 
+  const probes = { spikes: probeTimes, v: probeIdx.map((i) => engine.u[i] + engine.v0) };
+  probeTimes = probeIdx.map(() => []);
+  probeSeen = probeIdx.map(() => 0);
   engine.clearSpikeCounts();
   post(
     {
@@ -141,6 +164,7 @@ function sendFrame(simDelta: number) {
       meanRate: simDelta > 0 ? spikes / n / windowSec : 0,
       motor,
       topLabeled,
+      probes,
       activity,
     },
     [activity.buffer],

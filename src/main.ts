@@ -3,7 +3,11 @@ import { BEHAVIOR_LABEL, Controller } from "./behavior/Controller.ts";
 import { BodyScene } from "./body/BodyScene.ts";
 import { createFallbackRig, loadVrmRig } from "./body/Rig.ts";
 import { NeuralField } from "./brain/NeuralField.ts";
-import { COSMETICS, Care, DAILY_AFFECTION_CAP, GIFT, SNACK_PRICE, STAGES, type CosmeticId } from "./care/Care.ts";
+import { Raster } from "./brain/Raster.ts";
+import {
+  ACHIEVEMENTS, COSMETICS, Care, DAILY_AFFECTION_CAP, GIFT, SNACK_PRICE, STAGES, localDay,
+  type Achievement, type CosmeticId, type Totals,
+} from "./care/Care.ts";
 import { DEFAULT_NAMES, cleanName, hasBatchim, personalize } from "./story/personalize.ts";
 import { mutter } from "./story/scripts.ts";
 import { burst } from "./fx/Hearts.ts";
@@ -39,12 +43,14 @@ const MOTOR_LABEL: Record<MotorGroup, [string, string]> = {
 };
 const SENSORY_LABEL: Record<SensoryGroup, string> = {
   sugar: "당 GRN", bitter: "쓴맛 GRN", water: "물 GRN", pharynx_sugar: "인두 당 GRN", ir94e: "Ir94e(짠맛)",
-  jo_touch: "JO-F 접촉", looming: "LPLC2 루밍", light: "R7/R8 빛",
+  jo_touch: "JO-F 접촉", looming: "LPLC2 루밍", light: "R7/R8 빛", pc1: "pC1 설렘",
 };
 const METER_MAX_HZ = 150;
 
 // ---------------------------------------------------------------- 상태
 const care = Care.load(Date.now(), TIME_SCALE);
+// 테스트용: ?hearts=999 로 하트를 채운다
+if (params.has("hearts")) care.s.hearts = Math.max(0, Number(params.get("hearts")) || 0);
 const habitat = new Habitat();
 habitat.lightsOn = care.s.lightsOn;
 const controller = new Controller();
@@ -75,12 +81,26 @@ function say(text: string | null, seconds = 2.2, silent = false) {
   bubbleUntil = performance.now() / 1000 + seconds;
 }
 
+/** 새로 달성한 업적을 알린다 */
+function celebrate(list: Achievement[]) {
+  list.forEach((a, k) =>
+    setTimeout(() => {
+      say(`업적 달성! ${a.emoji} ${a.name} (+${a.reward}💖)`, 3.5);
+      sfx.levelUp();
+      burst(innerWidth / 2, innerHeight * 0.4, 10, [a.emoji, "✨", "💖"]);
+    }, k * 1800),
+  );
+}
+/** 돌봄 기록을 남기고 업적을 확인한다 (amount 0 이면 확인만) */
+const rec = (kind: keyof Totals, amount = 1) => celebrate(care.record(kind, Date.now(), amount));
+
 controller.onEvent = (e) => {
   say(care.on(e, Date.now()));
   const at = anchor();
   switch (e) {
     case "ate": {
       earn(2);
+      rec("meals");
       sfx.chew();
       burst(at.x, at.y, 2, ["♪"]);
       const kind = controller.eatingKind ?? "sweet";
@@ -92,6 +112,7 @@ controller.onEvent = (e) => {
       break;
     }
     case "scared":
+      rec("scares");
       sfx.jump();
       burst(at.x, at.y, 3, ["!", "💦"]);
       break;
@@ -102,6 +123,9 @@ controller.onEvent = (e) => {
     case "wake":
       director.greetIfNeeded(Date.now());
       break;
+    case "sleep":
+      rec("sleeps");
+      break;
   }
 };
 
@@ -110,6 +134,7 @@ function cleanUp(id?: number) {
   say(care.clean(Date.now(), id));
   if (care.s.messes.length < before) {
     earn((before - care.s.messes.length) * 2);
+    rec("cleans", before - care.s.messes.length);
     sfx.sparkle();
     const at = anchor();
     burst(at.x, at.y, id === undefined ? 8 : 3, ["✨", "✦"]);
@@ -140,6 +165,7 @@ const dialog = new DialogBox($("dialog"), {
     // 대화로 오르는 애정은 하루 다섯 번까지만
     const talks = care.todayStats(Date.now()).talks;
     care.bump(choice.mood ?? 0, talks <= 5 ? choice.affection ?? 0 : 0); // 하루 상한은 Care 가 한 번 더 건다
+    if ((choice.affection ?? 0) > 0) care.thrillUp(0.25);
     if ((choice.affection ?? 0) > 0 || (choice.mood ?? 0) > 0) {
       const at = anchor();
       burst(at.x, at.y, 4);
@@ -148,9 +174,11 @@ const dialog = new DialogBox($("dialog"), {
 });
 const director = new Director(care, dialog);
 director.onStageUp = (stage) => {
+  care.thrillUp(1);
   sfx.levelUp();
   burst(innerWidth / 2, innerHeight * 0.45, 14, ["♥", "💕", "✨"]);
   $("stage").textContent = `💞 ${STAGES[stage].name}`;
+  setTimeout(() => rec("talks", 0), 4000); // 관계 단계 업적
 };
 
 // ---------------------------------------------------------------- 방
@@ -165,6 +193,7 @@ loadVrmRig(`${BASE}models/onna.vrm`)
   .then((rig) => {
     body.setRig(rig);
     body.setCosmetics(care.s.owned); // 산 꾸미기 아이템 복원
+    if (care.s.photo) body.setPhoto(care.s.photo);
   });
 
 // ---------------------------------------------------------------- 뇌 패널 요소
@@ -196,6 +225,7 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
       $("load-label").textContent = `온나의 뇌를 깨우는 중… ${(msg.loaded / 1e6).toFixed(0)} / ${(msg.total / 1e6).toFixed(0)} MB`;
       break;
     case "ready":
+      raster.setNames(msg.probeNames);
       meta = msg.meta;
       applyNames();
       $("source").textContent =
@@ -218,7 +248,10 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
 };
 send({ type: "init", dt: DT_MS, adaptation: ADAPTATION });
 
+const raster = new Raster($<HTMLCanvasElement>("raster"));
+
 function onFrame(frame: SimFrame) {
+  raster.push(frame.probes, frame.simTime);
   lastFrame = frame;
   simSpeed = frame.speed;
   if (!ready) return;
@@ -250,6 +283,7 @@ function applyNames() {
 function wakeUp() {
   if (!ready || !care.named) return;
   $("overlay").hidden = true;
+  setTimeout(() => rec("photos", 0), 6000); // 함께한 날 등 시간으로 달성하는 업적
   const got = care.collectPending(Date.now());
   if (got > 0) {
     say(`기다리면서 하트 ${got}개 모았어!`, 3);
@@ -316,7 +350,11 @@ function pet() {
   if (controller.wakeUp()) return;
   const line = care.on("petted", Date.now());
   say(line);
-  if (line !== "그만 좀 해!" && line !== "흥…") earn(1);
+  if (line !== "그만 좀 해!" && line !== "흥…") {
+    earn(1);
+    care.thrillUp(0.2 + 0.3 * care.s.affection);
+    rec("pets");
+  }
   if (line !== "그만~") {
     sfx.pet();
     const at = anchor();
@@ -329,6 +367,33 @@ function talk() {
   if (care.s.asleep) return say("쿨쿨…");
   if (controller.state.behavior === "escape") return;
   director.talk(Date.now());
+  rec("talks");
+}
+
+/** 📷 지금 화면을 저장하고, 작게 줄여 액자에 건다 */
+function takePhoto() {
+  if (!ready) return;
+  const url = body.capture();
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${charName()}-${localDay(Date.now())}.png`;
+  link.click();
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement("canvas");
+    c.width = 320;
+    c.height = Math.round((320 * img.height) / img.width);
+    c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+    care.s.photo = c.toDataURL("image/jpeg", 0.75);
+    body.setPhoto(care.s.photo);
+  };
+  img.src = url;
+  document.body.classList.remove("flash");
+  void document.body.offsetWidth; // 애니메이션 다시 시작
+  document.body.classList.add("flash");
+  sfx.sparkle();
+  say("찰칵! 📷");
+  rec("photos");
 }
 
 function toggleLights() {
@@ -407,6 +472,7 @@ $("btn-light").onclick = toggleLights;
 $("btn-brain").onclick = () => togglePanel("brain-panel");
 $("btn-diary").onclick = () => togglePanel("diary-panel");
 $("btn-shop").onclick = () => togglePanel("shop-panel");
+$("btn-photo").onclick = takePhoto;
 for (const btn of document.querySelectorAll<HTMLElement>("[data-close]")) {
   btn.onclick = () => togglePanel(btn.dataset.close as PanelId, false);
 }
@@ -468,6 +534,7 @@ document.addEventListener("visibilitychange", () => {
 
 // ---------------------------------------------------------------- 루프
 let lastTime = performance.now();
+let lastBehavior = controller.state.behavior;
 let uiClock = 0;
 
 function frameLoop(now: number) {
@@ -482,18 +549,23 @@ function frameLoop(now: number) {
     worldTime += worldDt;
     // 오늘 기록: 뇌 출력으로 먹거나 손질한 시간
     const b = controller.state.behavior;
+    if (b === "groom" && lastBehavior !== "groom") rec("grooms");
+    lastBehavior = b;
     if (b === "feed") care.todayStats(Date.now()).feedSec += worldDt;
     // 입에 닿은 간식의 MN9 반응을 기록한다 (안 먹어도 "맛은 봤다"로 남는다)
     const tasting = controller.eatingKind ?? habitat.tasting(controller.state);
     if (tasting && !care.s.asleep) care.noteTaste(tasting, controller.rates.feed);
     if (b === "groom") care.todayStats(Date.now()).groomSec += worldDt;
-    const rates = habitat.sense(controller.state, worldTime, care.s.hunger, care.s.asleep);
+    const rates = habitat.sense(controller.state, worldTime, care.s.hunger, care.s.asleep, care.thrill);
     for (const g of SENSORY_GROUPS) sendStim(g, rates[g]);
   }
   body.render(dt, controller.state, habitat.foods, care.s.messes, care.s.lightsOn, care.s.mood);
   const panelsOpen = !$("brain-panel").hidden || !$("diary-panel").hidden;
   director.update(Date.now(), ready && !care.s.asleep && !panelsOpen && controller.state.behavior === "walk");
-  if (!$("brain-panel").hidden) neural?.render();
+  if (!$("brain-panel").hidden) {
+    neural?.render();
+    raster.draw();
+  }
 
   // 말풍선: 이벤트 대사가 없으면 가끔 속마음
   const t = now / 1000;
@@ -568,7 +640,7 @@ function renderShop() {
     ...(Object.keys(COSMETICS) as CosmeticId[]).map((id) => {
       const item = COSMETICS[id];
       const owned = s.owned.includes(id);
-      return shopItem(item.emoji, item.label, item.note, owned ? null : item.price, owned || hearts < item.price, () => {
+      return shopItem(item.emoji, item.label, `${item.note} · 하트 적립 +${Math.round(item.bonus * 100)}%`, owned ? null : item.price, owned || hearts < item.price, () => {
         if (care.buyCosmetic(id, Date.now())) {
           sfx.sparkle();
           body.setCosmetics(care.s.owned);
@@ -583,6 +655,7 @@ function renderShop() {
   $("shop-gift").replaceChildren(
     shopItem("🎁", "선물 상자", giftNote, GIFT.price, !care.canGift, () => {
       if (care.giveGift(Date.now())) {
+        care.thrillUp(0.8);
         sfx.levelUp();
         say("이거… 나 주는 거야? 헤헤♡", 3);
         burst(innerWidth / 2, innerHeight * 0.5, 8, ["♥", "🎁"]);
@@ -695,6 +768,32 @@ function renderDiary() {
         .join(" · ")
     : "아직 아무 간식도 맛보지 않았어요. 간식을 주면 뇌 반응으로 취향을 알 수 있어요.";
   $("diary-stats").after(taste);
+
+  const list = document.createElement("ul");
+  list.className = "achievements note";
+  list.replaceChildren(
+    ...ACHIEVEMENTS.map((a) => {
+      const done = s.unlocked.includes(a.id);
+      const li = document.createElement("li");
+      li.className = done ? "" : "locked";
+      const emoji = document.createElement("span");
+      emoji.className = "emoji";
+      emoji.textContent = a.emoji;
+      const text = document.createElement("span");
+      text.textContent = `${a.name} `;
+      const small = document.createElement("small");
+      small.textContent = a.note;
+      text.append(small);
+      const reward = document.createElement("small");
+      reward.textContent = done ? "✔" : `+${a.reward}💖`;
+      li.append(emoji, text, reward);
+      return li;
+    }),
+  );
+  const heading = document.createElement("p");
+  heading.className = "note";
+  heading.textContent = `업적 ${s.unlocked.length}/${ACHIEVEMENTS.length} · 하트 적립 ×${care.heartBonus.toFixed(2)}`;
+  $("diary-stats").after(heading, list);
 
   const today = new Date(now).toDateString();
   $("diary-list").replaceChildren(

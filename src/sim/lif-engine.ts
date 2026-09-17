@@ -65,6 +65,8 @@ export class LifEngine {
   private readonly cww: number;
   private readonly bAdapt: number;
   private readonly uTh: number;
+  /** 휴지 전위 (mV). u 에 더하면 막전위 */
+  readonly v0: number;
   private readonly uReset: number;
   private readonly wSyn: number;
   private readonly wPoisson: number;
@@ -103,6 +105,7 @@ export class LifEngine {
     this.cww = ew;
     this.bAdapt = adapt.b;
     this.uTh = p.vTh - p.v0;
+    this.v0 = p.v0;
     this.uReset = p.vReset - p.v0;
     this.wSyn = p.wSyn;
     this.wPoisson = p.wSyn * p.fPoisson;

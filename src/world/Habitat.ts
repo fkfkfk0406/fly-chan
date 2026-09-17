@@ -46,6 +46,8 @@ export const MOUTH_REACH = 0.55; // m, 이 안이면 맛을 느낀다
 const WALL_TOUCH = 0.25; // m, 이보다 가까우면 더듬이가 벽에 닿음
 const WALL_REARM = 0.5; // m, 이만큼 떨어지면 다음 접촉을 다시 느낌
 const WALL_TOUCH_SEC = 0.6;
+/** 설렘 최대치에서 pC1 자극 (Hz). 다른 입력과 겹쳐도 폭주하지 않는 범위 (scripts/pc1-safety.ts) */
+export const PC1_MAX_HZ = 60;
 /** 딸기 하나를 다 먹는 데 걸리는 시간 (s) */
 export const EAT_SECONDS = 4;
 
@@ -127,7 +129,12 @@ export class Habitat {
   }
 
   /** 현재 상황에서 감각 그룹별 Poisson 발화율 (Hz) */
-  sense(pose: Pose, now: number, hunger: number, asleep: boolean): Record<SensoryGroup, number> {
+  /**
+   * @param thrill 설렘 0-1 (게임 상태). pC1 에 최대 PC1_MAX_HZ 로 들어간다.
+   *   pC1 은 이 모델의 어떤 감각 입력으로도 켜지지 않아서(scripts/pc1-probe.ts, song-probe.ts),
+   *   "마음은 게임 상태, 그 마음이 몸에 나타나는 방식은 뇌"로 연결한다 (CoTFly 의 신경 게인과 같은 발상)
+   */
+  sense(pose: Pose, now: number, hunger: number, asleep: boolean, thrill = 0): Record<SensoryGroup, number> {
     const wall = this.wallDistance(pose);
     if (!asleep && wall < WALL_TOUCH && this.wallArmed) {
       this.wallTouchUntil = now + WALL_TOUCH_SEC;
@@ -140,6 +147,7 @@ export class Habitat {
       looming: now < this.threatUntil ? 220 : 0,
       // 눈을 감고 있거나 불이 꺼져 있으면 광수용체 입력 없음
       light: this.lightsOn && !asleep ? 8 : 0,
+      pc1: asleep ? 0 : clamp(thrill, 0, 1) * PC1_MAX_HZ,
     };
     if (asleep) return rates;
     // 입에 닿은 간식 중 가장 가까운 하나만 맛본다.
