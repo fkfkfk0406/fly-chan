@@ -5,8 +5,8 @@
 /** 보정 (scripts/loom-probe.ts): 루밍 6 Hz 까지는 대체로 버티고, 8 Hz 부터 Giant Fiber 가 30 Hz 를 넘는다 */
 import { L } from "../i18n.ts";
 
-export const LOOM_GAIN = 20;
-const REACH = { vMax: 0.45, accel: 1.2, brake: 3, limit: 25 };
+export const LOOM_GAIN = 15;
+const REACH = { vMax: 0.45, accel: 0.8, brake: 4, limit: 25 };
 const CATCH = { seconds: 20, spawnEvery: 0.55 };
 
 export type GameResult =
@@ -105,7 +105,10 @@ export class MiniGames {
     };
     this.step = (dt) => {
       t += dt;
-      v = holding ? Math.min(REACH.vMax, v + REACH.accel * dt) : Math.max(0, v - REACH.brake * dt);
+      // 가까울수록 같은 속도라도 더 위험하니, 계속 눌러도 거리에 맞춰 최고 속도를 자동으로 낮춘다
+      // (그래도 끝까지 안전하진 않게: 완전히 안전하려면 마지막엔 손을 늦춰야 한다)
+      const vCap = Math.min(REACH.vMax, (7 * (0.35 + d) ** 2) / LOOM_GAIN);
+      v = holding ? Math.min(vCap, v + REACH.accel * dt) : Math.max(0, v - REACH.brake * dt);
       d = Math.max(0, d - v * dt);
       const hz = loomingHz(v, d);
       this.hooks.setLooming(hz);

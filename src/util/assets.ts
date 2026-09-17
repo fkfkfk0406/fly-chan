@@ -56,24 +56,35 @@ export async function ensureAssets(onProgress: (loaded: number, label: string) =
   const { fetch: nativeFetch } = await import("@tauri-apps/plugin-http");
   const cache = await caches.open(CACHE);
   let loaded = 0;
+  const MAX_ATTEMPTS = 3;
   for (const path of ASSET_FILES) {
     if (await cache.match(cacheKey(path))) continue;
-    const res = await nativeFetch(RELEASE_BASE + releaseName(path));
-    if (!res.ok || !res.body) throw new Error(L(`${releaseName(path)} 을 받지 못했어요 (${res.status}). 인터넷 연결을 확인해 주세요.`, `Could not download ${releaseName(path)} (${res.status}). Check your internet connection.`));
-    const size = Number(res.headers.get("content-length")) || 0;
-    const reader = res.body.getReader();
-    const chunks: Uint8Array<ArrayBuffer>[] = [];
-    let got = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value as Uint8Array<ArrayBuffer>);
-      got += value.length;
-      loaded += value.length;
-      onProgress(loaded, releaseName(path));
+    const name = releaseName(path);
+    for (let attempt = 1; ; attempt++) {
+      let got = 0;
+      try {
+        const res = await nativeFetch(RELEASE_BASE + name);
+        if (!res.ok || !res.body) throw new Error(L(`${name} 을 받지 못했어요 (${res.status}). 인터넷 연결을 확인해 주세요.`, `Could not download ${name} (${res.status}). Check your internet connection.`));
+        const size = Number(res.headers.get("content-length")) || 0;
+        const reader = res.body.getReader();
+        const chunks: Uint8Array<ArrayBuffer>[] = [];
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value as Uint8Array<ArrayBuffer>);
+          got += value.length;
+          loaded += value.length;
+          onProgress(loaded, name);
+        }
+        if (size && got !== size) throw new Error(L(`${name} 다운로드가 중간에 끊겼어요. 다시 실행해 주세요.`, `Download of ${name} was interrupted. Please restart the app.`));
+        await cache.put(cacheKey(path), new Response(new Blob(chunks), { headers: { "content-length": String(got) } }));
+        break;
+      } catch (err) {
+        loaded -= got; // 실패한 만큼 진행률을 되돌린다
+        if (attempt >= MAX_ATTEMPTS) throw err;
+        await new Promise((r) => setTimeout(r, 500 * attempt));
+      }
     }
-    if (size && got !== size) throw new Error(L(`${releaseName(path)} 다운로드가 중간에 끊겼어요. 다시 실행해 주세요.`, `Download of ${releaseName(path)} was interrupted. Please restart the app.`));
-    await cache.put(cacheKey(path), new Response(new Blob(chunks), { headers: { "content-length": String(got) } }));
   }
   // 데이터가 새 태그로 바뀌었으면 예전에 받아 둔 것을 지운다
   for (const name of await caches.keys()) {
