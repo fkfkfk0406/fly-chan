@@ -445,7 +445,7 @@ body.desktop { --safe-top: 28px; }
 .titlebar span { flex: 1; }
 .titlebar button { width: 30px; height: 22px; border: 0; border-radius: 6px; background: transparent; font-size: 12px; color: var(--muted); }
 .titlebar button:hover { background: var(--accent-soft); color: var(--accent); }
-.titlebar button:not(.on)[aria-label="항상 위"] { opacity: 0.4; }
+.titlebar button.pin:not(.on) { opacity: 0.4; }
 
 .update-banner {
   position: fixed; left: 50%; bottom: calc(96px + var(--safe-bottom)); transform: translateX(-50%); z-index: 30;
@@ -455,3 +455,9 @@ body.desktop { --safe-top: 28px; }
 .update-banner span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .update-banner button { border: 1px solid var(--line); background: #fff; border-radius: 99px; padding: 4px 10px; font-size: 12px; }
 .update-banner button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+
+/* 언어 선택 */
+.lang-switch { display: flex; justify-content: center; gap: 4px; margin: 4px 0 8px; }
+.lang-switch button { font-size: 12px; padding: 4px 12px; border-radius: 99px; border: 1px solid var(--line); background: #fff; color: var(--muted); }
+.lang-switch button.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+.drawer .lang-switch { justify-content: flex-start; margin-top: 12px; }

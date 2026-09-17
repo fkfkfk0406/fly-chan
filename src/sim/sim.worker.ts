@@ -4,6 +4,7 @@ import {
 } from "./data.ts";
 import type { FromWorker, ToWorker } from "./protocol.ts";
 import { fetchAsset } from "../util/assets.ts";
+import { L, useLang } from "../i18n.ts";
 
 const FRAME_MS = 33; // 스냅샷 주기
 const BUDGET_MS = 22; // 프레임당 계산 예산
@@ -27,9 +28,10 @@ let debt = 0;
 let speedEma = 1;
 
 // 인스펙터에 보여 줄 핵심 뉴런: 그룹마다 대표 뉴런 하나
-const PROBES: [string, keyof Groups][] = [
-  ["당 GRN", "sugar"], ["쓴맛 GRN", "bitter"], ["물 GRN", "water"], ["JO-F 접촉", "jo_touch"], ["LPLC2 루밍", "looming"],
-  ["pC1 설렘", "pc1"], ["MN9 섭식", "feed"], ["Giant Fiber", "escape"], ["그루밍 DN", "groom"], ["DNa 좌회전", "turn_left"], ["P9 전진", "forward"], ["시계 LNv 아침", "clock_lnv"], ["시계 LNd 저녁", "clock_lnd"],
+/** [한국어 이름, 영어 이름, 그룹] */
+const PROBES: [string, string, keyof Groups][] = [
+  ["당 GRN", "Sugar GRN", "sugar"], ["쓴맛 GRN", "Bitter GRN", "bitter"], ["물 GRN", "Water GRN", "water"], ["JO-F 접촉", "JO-F touch", "jo_touch"], ["LPLC2 루밍", "LPLC2 looming", "looming"],
+  ["pC1 설렘", "pC1 excitement", "pc1"], ["MN9 섭식", "MN9 feeding", "feed"], ["Giant Fiber", "Giant Fiber", "escape"], ["그루밍 DN", "Grooming DN", "groom"], ["DNa 좌회전", "DNa left turn", "turn_left"], ["P9 전진", "P9 forward", "forward"], ["시계 LNv 아침", "Clock LNv morning", "clock_lnv"], ["시계 LNd 저녁", "Clock LNd evening", "clock_lnd"],
 ];
 let probeIdx: number[] = [];
 let probeSeen: number[] = [];
@@ -37,7 +39,7 @@ let probeTimes: number[][] = [];
 
 async function fetchBuffer(name: string, loaded: { bytes: number; total: number }): Promise<ArrayBuffer> {
   const res = await fetchAsset(`data/${name}`);
-  if (!res.ok || !res.body) throw new Error(`${name} 을 불러오지 못했습니다 (${res.status}). npm run data 를 먼저 실행하세요.`);
+  if (!res.ok || !res.body) throw new Error(L(`${name} 을 불러오지 못했습니다 (${res.status}). npm run data 를 먼저 실행하세요.`, `Could not load ${name} (${res.status}). Run npm run data first.`));
   const reader = res.body.getReader();
   const size = Number(res.headers.get("content-length")) || 0;
   const chunks: Uint8Array[] = [];
@@ -50,7 +52,7 @@ async function fetchBuffer(name: string, loaded: { bytes: number; total: number 
     loaded.bytes += value.length;
     post({ type: "progress", loaded: loaded.bytes, total: loaded.total, label: name });
   }
-  if (size && got !== size) throw new Error(`${name} 다운로드가 중간에 끊겼습니다`);
+  if (size && got !== size) throw new Error(L(`${name} 다운로드가 중간에 끊겼습니다`, `Download of ${name} was interrupted`));
   const out = new Uint8Array(got);
   let o = 0;
   for (const c of chunks) {
@@ -76,10 +78,10 @@ async function init(dt: number, adaptation: Adaptation) {
   engine = new LifEngine(parseConnectome(meta, buffers), meta.lif, dt, (Math.random() * 2 ** 31) | 0, adaptation);
   trace = new Float32Array(meta.neurons);
   const groupSizes = Object.fromEntries(Object.entries(groups).map(([k, v]) => [k, v.length]));
-  probeIdx = PROBES.map(([, g]) => groups[g][0]);
+  probeIdx = PROBES.map(([, , g]) => groups[g][0]);
   probeSeen = probeIdx.map(() => 0);
   probeTimes = probeIdx.map(() => []);
-  post({ type: "ready", meta, groupSizes, probeNames: PROBES.map(([name]) => name) });
+  post({ type: "ready", meta, groupSizes, probeNames: PROBES.map(([ko, en]) => L(ko, en)) });
   lastWall = performance.now();
   loop();
 }
@@ -176,6 +178,7 @@ scope.onmessage = (e) => {
   try {
     switch (msg.type) {
       case "init":
+        useLang(msg.lang);
         init(msg.dt, msg.adaptation).catch((err) => post({ type: "error", message: String(err?.message ?? err) }));
         break;
       case "stim":

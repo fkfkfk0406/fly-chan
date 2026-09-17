@@ -28,6 +28,8 @@ import { NO_ADAPTATION } from "./sim/lif-engine.ts";
 import type { FromWorker, SimFrame, ToWorker } from "./sim/protocol.ts";
 import { hourOf } from "./world/Clock.ts";
 import { Habitat, SNACKS, type FoodKind } from "./world/Habitat.ts";
+import { L, LANG, applyStaticText, setLang, type Lang } from "./i18n.ts";
+import { PET_LINES } from "./care/Care.ts";
 
 const params = new URLSearchParams(location.search);
 // 적분 간격. ?dt=0.25 처럼 바꿀 수 있다 (작을수록 정확하지만 느림)
@@ -42,19 +44,24 @@ const MAX_FOODS = 3;
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
 const MOTOR_LABEL: Record<MotorGroup, [string, string]> = {
-  forward: ["P9 · 전진", "DNp09 (P9 하강뉴런), 전진 보행"],
-  backward: ["MDN · 후진", "Moonwalker 하강뉴런, 후진 보행"],
-  turn_left: ["DNa01/02 · 좌", "왼쪽 DNa01·DNa02, 왼쪽 회전"],
-  turn_right: ["DNa01/02 · 우", "오른쪽 DNa01·DNa02, 오른쪽 회전"],
-  escape: ["Giant Fiber", "DNp01, 도약 탈출"],
-  groom: ["그루밍 DN", "DNg84·DNg29·DNg57, JO-F 접촉에 반응"],
-  feed: ["MN9 · 섭식", "주둥이 운동뉴런 MN9"],
+  forward: [L("P9 · 전진", "P9 · forward"), L("DNp09 (P9 하강뉴런), 전진 보행", "DNp09 (P9 descending neuron), forward walking")],
+  backward: [L("MDN · 후진", "MDN · backward"), L("Moonwalker 하강뉴런, 후진 보행", "Moonwalker descending neuron, backward walking")],
+  turn_left: [L("DNa01/02 · 좌", "DNa01/02 · left"), L("왼쪽 DNa01·DNa02, 왼쪽 회전", "Left DNa01·DNa02, turning left")],
+  turn_right: [L("DNa01/02 · 우", "DNa01/02 · right"), L("오른쪽 DNa01·DNa02, 오른쪽 회전", "Right DNa01·DNa02, turning right")],
+  escape: ["Giant Fiber", L("DNp01, 도약 탈출", "DNp01, jump escape")],
+  groom: [L("그루밍 DN", "Grooming DNs"), L("DNg84·DNg29·DNg57, JO-F 접촉에 반응", "DNg84·DNg29·DNg57, respond to JO-F touch")],
+  feed: [L("MN9 · 섭식", "MN9 · feeding"), L("주둥이 운동뉴런 MN9", "Proboscis motor neuron MN9")],
 };
-const SENSORY_LABEL: Record<SensoryGroup, string> = {
+const SENSORY_LABEL: Record<SensoryGroup, string> = L<Record<SensoryGroup, string>>({
   sugar: "당 GRN", bitter: "쓴맛 GRN", water: "물 GRN", pharynx_sugar: "인두 당 GRN", ir94e: "Ir94e(짠맛)",
   jo_touch: "JO-F 접촉", looming: "LPLC2 루밍", light: "R7/R8 빛", pc1: "pC1 설렘",
   clock_lnv: "시계 LNv(아침)", clock_lnd: "시계 LNd(저녁)", clock_dn1: "시계 DN1(새벽·해질녘)",
-};
+}, {
+  sugar: "Sugar GRNs", bitter: "Bitter GRNs", water: "Water GRNs", pharynx_sugar: "Pharyngeal sugar GRNs", ir94e: "Ir94e (salt)",
+  jo_touch: "JO-F touch", looming: "LPLC2 looming", light: "R7/R8 light", pc1: "pC1 excitement",
+  clock_lnv: "Clock LNv (morning)", clock_lnd: "Clock LNd (evening)", clock_dn1: "Clock DN1 (dawn · dusk)",
+});
+applyStaticText();
 const METER_MAX_HZ = 150;
 
 // ---------------------------------------------------------------- 상태
@@ -107,7 +114,7 @@ function egg(id: string, reward: number, note: string, line?: string) {
 function celebrate(list: Achievement[]) {
   list.forEach((a, k) =>
     setTimeout(() => {
-      say(`업적 달성! ${a.emoji} ${a.name} (+${a.reward}💖)`, 3.5);
+      say(L(`업적 달성! ${a.emoji} ${a.name} (+${a.reward}💖)`, `Achievement! ${a.emoji} ${a.name} (+${a.reward}💖)`), 3.5);
       sfx.levelUp();
       burst(innerWidth / 2, innerHeight * 0.4, 10, [a.emoji, "✨", "💖"]);
     }, k * 1800),
@@ -124,7 +131,7 @@ function finishQuests() {
   const { done, bonus } = claimQuests(care, Date.now());
   if (!done.length) return;
   sfx.levelUp();
-  say(bonus ? "오늘 부탁 다 들어줬네! 고마워♡" : `부탁 들어줘서 고마워! (${done.map((q) => q.label).join(", ")})`, 3);
+  say(bonus ? L("오늘 부탁 다 들어줬네! 고마워♡", "You did everything I asked today! Thank you♡") : L(`부탁 들어줘서 고마워! (${done.map((q) => q.label).join(", ")})`, `Thanks for doing that! (${done.map((q) => q.label).join(", ")})`), 3);
   burst(innerWidth / 2, innerHeight * 0.45, bonus ? 12 : 5, ["📋", "💖"]);
 }
 
@@ -139,16 +146,16 @@ controller.onEvent = (e) => {
       rec("meals");
       care.s.sweetStreak = (controller.eatingKind ?? "sweet") === "sweet" ? care.s.sweetStreak + 1 : 0;
       if (care.s.sweetStreak >= 10 && !care.s.title) {
-        care.s.title = "딸기 요정";
+        care.s.title = L("딸기 요정", "Strawberry Fairy");
         body.setCosmetics(worn());
-        egg("berry-fairy", 30, "딸기 연속 10개", "딸기 10개 연속…! 오늘부터 난 🍓딸기 요정이야!");
+        egg("berry-fairy", 30, L("딸기 연속 10개", "10 strawberries in a row"), L("딸기 10개 연속…! 오늘부터 난 🍓딸기 요정이야!", "Ten strawberries in a row…! From today I'm the 🍓Strawberry Fairy!"));
       }
       sfx.chew();
       burst(at.x, at.y, 2, ["♪"]);
       const kind = controller.eatingKind ?? "sweet";
-      if ((kind === "sweet" || kind === "honey") && care.soothe(0.35, Date.now())) setTimeout(() => say("…맛있으니까 봐줄게", 3), 1200);
+      if ((kind === "sweet" || kind === "honey") && care.soothe(0.35, Date.now())) setTimeout(() => say(L("…맛있으니까 봐줄게", "…it's tasty, so I'll forgive you"), 3), 1200);
       const label = SNACKS[kind].label;
-      care.log(Date.now(), `${label}${hasBatchim(label) ? "을" : "를"} ${kind === "water" ? "마셨어요" : "먹었어요"}.`);
+      care.log(Date.now(), L(`${label}${hasBatchim(label) ? "을" : "를"} ${kind === "water" ? "마셨어요" : "먹었어요"}.`, `${kind === "water" ? "Drank" : "Ate"} ${label.toLowerCase()}.`));
       // 달콤한 간식은 먹은 자리에 끈적한 얼룩을 남긴다
       const food = kind === "sweet" || kind === "honey" ? habitat.nearest(controller.state, kind) : null;
       if (food) care.addMess("stain", food.food.x + 0.15, food.food.z + 0.1);
@@ -161,7 +168,7 @@ controller.onEvent = (e) => {
       break;
     case "bitter":
       sfx.sad();
-      if (care.s.avatar === "fly") egg("fly-bitter", 10, "초파리 모습으로 쓴 버섯", "초파리여도 쓴 건 싫거든?");
+      if (care.s.avatar === "fly") egg("fly-bitter", 10, L("초파리 모습으로 쓴 버섯", "A bitter mushroom as a fly"), L("초파리여도 쓴 건 싫거든?", "Being a fly doesn't mean I like bitter stuff, okay?"));
       break;
     case "woken":
       sfx.sad();
@@ -251,7 +258,7 @@ async function applyAvatar(kind: AvatarKind): Promise<boolean> {
     }
     else if (kind === "custom") {
       const blob = await getBlob("custom-vrm");
-      if (!blob) throw new Error("저장된 VRM 이 없어요");
+      if (!blob) throw new Error(L("저장된 VRM 이 없어요", "No saved VRM"));
       const url = URL.createObjectURL(blob);
       body.setRig(await loadVrmRig(url), "custom");
       URL.revokeObjectURL(url);
@@ -270,7 +277,7 @@ async function applyAvatar(kind: AvatarKind): Promise<boolean> {
     return true;
   } catch (err) {
     console.warn("외형을 바꾸지 못했어요:", err);
-    say("그 모습은 불러올 수 없어…");
+    say(L("그 모습은 불러올 수 없어…", "I can't load that look…"));
     return false;
   } finally {
     avatarLoading = false;
@@ -287,7 +294,7 @@ $<HTMLInputElement>("vrm-file").addEventListener("change", async (e) => {
   await putBlob("custom-vrm", file);
   body.forgetAvatar("custom");
   if (await applyAvatar("custom")) {
-    care.log(Date.now(), `새 모습(${file.name})으로 바꿨어요.`);
+    care.log(Date.now(), L(`새 모습(${file.name})으로 바꿨어요.`, `Changed to a new look (${file.name}).`));
     sfx.sparkle();
   }
   renderShop();
@@ -309,7 +316,7 @@ for (const g of MOTOR_GROUPS) {
       taps = [...taps.filter((x) => t - x < 3000), t];
       if (taps.length >= 5) {
         taps = [];
-        egg("mn9", 15, "MN9 연타", "MN9 그만 눌러… 배고파지잖아!");
+        egg("mn9", 15, L("MN9 연타", "Spamming MN9"), L("MN9 그만 눌러… 배고파지잖아!", "Stop poking MN9… you're making me hungry!"));
       }
     });
   }
@@ -330,18 +337,18 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
   switch (msg.type) {
     case "progress":
       $("load-bar").style.width = `${(msg.loaded / msg.total) * 100}%`;
-      $("load-label").textContent = `${charName()}의 뇌를 깨우는 중… ${(msg.loaded / 1e6).toFixed(0)} / ${(msg.total / 1e6).toFixed(0)} MB`;
+      $("load-label").textContent = L(`${charName()}의 뇌를 깨우는 중…`, `Waking up ${charName()}'s brain…`) + ` ${(msg.loaded / 1e6).toFixed(0)} / ${(msg.total / 1e6).toFixed(0)} MB`;
       break;
     case "ready":
       raster.setNames(msg.probeNames);
       meta = msg.meta;
       applyNames();
       $("source").textContent =
-        `FlyWire v783 · 시냅스 ${(meta.synapses / 1e6).toFixed(1)}M · LIF dt ${DT_MS} ms` +
-        (ADAPTATION.b ? ` · 적응 ${ADAPTATION.tauW} ms/${ADAPTATION.b} mV` : "") +
-        (TIME_SCALE !== 1 ? ` · 시간 ${TIME_SCALE}배속` : "");
+        `FlyWire v783 · ${L("시냅스", "synapses")} ${(meta.synapses / 1e6).toFixed(1)}M · LIF dt ${DT_MS} ms` +
+        (ADAPTATION.b ? ` · ${L("적응", "adaptation")} ${ADAPTATION.tauW} ms/${ADAPTATION.b} mV` : "") +
+        (TIME_SCALE !== 1 ? L(` · 시간 ${TIME_SCALE}배속`, ` · time ×${TIME_SCALE}`) : "");
       ready = true;
-      $("load-label").textContent = care.named ? "" : "이름을 지어 주면 깨어나요";
+      $("load-label").textContent = care.named ? "" : L("이름을 지어 주면 깨어나요", "She wakes up once you name her");
       if (care.named) wakeUp();
       break;
     case "frame":
@@ -358,9 +365,9 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
 const ASSET_TOTAL_MB = 104;
 void ensureAssets((loaded, label) => {
   $("load-bar").style.width = `${Math.min(100, (loaded / ASSET_TOTAL_MB / 1e6) * 100)}%`;
-  $("load-label").textContent = `처음 한 번만 뇌 데이터를 받는 중… ${(loaded / 1e6).toFixed(0)} / ${ASSET_TOTAL_MB} MB (${label})`;
+  $("load-label").textContent = L("처음 한 번만 뇌 데이터를 받는 중…", "Downloading brain data (first time only)…") + ` ${(loaded / 1e6).toFixed(0)} / ${ASSET_TOTAL_MB} MB (${label})`;
 })
-  .then(() => send({ type: "init", dt: DT_MS, adaptation: ADAPTATION }))
+  .then(() => send({ type: "init", dt: DT_MS, adaptation: ADAPTATION, lang: LANG }))
   .catch((err: Error) => {
     $("overlay").hidden = false;
     $("overlay").querySelector(".loading")!.classList.add("error");
@@ -394,8 +401,9 @@ function applyNames() {
   const name = charName();
   for (const el of document.querySelectorAll("[data-name]")) el.textContent = name;
   for (const el of document.querySelectorAll("[data-name-upper]")) el.textContent = name.toUpperCase();
-  document.title = `${name} · 초파리 뇌를 가진 소녀`;
-  if (meta) $("neuron-title").textContent = `${name}의 뇌 · 뉴런 ${meta.neurons.toLocaleString()}개`;
+  document.title = L(`${name} · 초파리 뇌를 가진 소녀`, `${name} · a girl with a fruit fly's brain`);
+  $("diary-title").textContent = L(`${name}의 일기`, `${name}'s diary`);
+  if (meta) $("neuron-title").textContent = L(`${name}의 뇌 · 뉴런 ${meta.neurons.toLocaleString()}개`, `${name}'s brain · ${meta.neurons.toLocaleString()} neurons`);
 }
 
 /** 뇌가 준비되고 이름도 지었으면 방을 보여 준다 */
@@ -405,13 +413,13 @@ function wakeUp() {
   setTimeout(() => rec("photos", 0), 6000); // 함께한 날 등 시간으로 달성하는 업적
   const got = care.collectPending(Date.now());
   if (got > 0) {
-    say(`기다리면서 하트 ${got}개 모았어!`, 3);
+    say(L(`기다리면서 하트 ${got}개 모았어!`, `I saved up ${got} hearts while waiting!`), 3);
     setTimeout(() => burst(innerWidth / 2, innerHeight * 0.5, Math.min(10, got), ["💖"]), 400);
   }
   const stamp = checkIn(care, Date.now());
   if (stamp) {
     setTimeout(() => {
-      say(`출석 ${stamp.streak}일째! 하트 ${stamp.reward}개 줄게`, 3);
+      say(L(`출석 ${stamp.streak}일째! 하트 ${stamp.reward}개 줄게`, `Day ${stamp.streak} check-in! Here are ${stamp.reward} hearts`), 3);
       burst(innerWidth / 2, innerHeight * 0.5, stamp.streak % 7 === 0 ? 14 : 5, ["📅", "💖"]);
     }, 1800);
   }
@@ -432,10 +440,10 @@ function showLetter(then: () => void) {
     box.append(p);
   }
   const ok = document.createElement("button");
-  ok.textContent = letter.gift ? `${SNACKS[letter.gift].emoji} 받고 닫기` : "고마워";
+  ok.textContent = letter.gift ? L(`${SNACKS[letter.gift].emoji} 받고 닫기`, `${SNACKS[letter.gift].emoji} Take it`) : L("고마워", "Thank you");
   ok.onclick = () => {
     if (letter.gift) care.s.stock[letter.gift]++;
-    care.log(Date.now(), `✉️ ${charName()}의 편지를 읽었어요${letter.gift ? ` (${SNACKS[letter.gift].label} 선물)` : ""}.`);
+    care.log(Date.now(), L(`✉️ ${charName()}의 편지를 읽었어요${letter.gift ? ` (${SNACKS[letter.gift].label} 선물)` : ""}.`, `✉️ Read ${charName()}'s letter${letter.gift ? ` (gift: ${SNACKS[letter.gift].label})` : ""}.`));
     care.s.letter = null;
     box.remove();
     sfx.choice();
@@ -451,17 +459,17 @@ function greet() {
   const now = new Date();
   if (care.s.asleep) say("💤", 2, true);
   else if (is404(now)) {
-    egg("404", 44, "새벽 4시 4분", "404… 뇌를 찾을 수 없어요… zzZ");
+    egg("404", 44, L("새벽 4시 4분", "4:04 AM"), L("404… 뇌를 찾을 수 없어요… zzZ", "404… Brain not found… zzZ"));
     setTimeout(() => director.greetIfNeeded(Date.now()), 4000);
   } else director.greetIfNeeded(Date.now());
   const special = specialDay(now, care.daysTogether());
   if (special && !care.s.eggs.includes(special.id)) {
     director.queueScene(special.scene);
-    egg(special.id, special.reward, special.scene.id === "xmas" ? "크리스마스" : special.scene.id === "pi" ? "파이데이" : `함께한 지 ${care.daysTogether()}일`);
+    egg(special.id, special.reward, special.scene.id === "xmas" ? L("크리스마스", "Christmas") : special.scene.id === "pi" ? L("파이데이", "Pi Day") : L(`함께한 지 ${care.daysTogether()}일`, `${care.daysTogether()} days together`));
   }
   if (isScientificName(care.s.name) && !care.s.eggs.includes("name")) {
     director.queueScene(SCIENTIFIC_NAME_SCENE);
-    egg("name", 20, "학명으로 이름 짓기");
+    egg("name", 20, L("학명으로 이름 짓기", "Named after her scientific name"));
   }
 }
 
@@ -470,7 +478,7 @@ function showNaming() {
   $("naming").hidden = false;
   $<HTMLInputElement>("input-name").value = "";
   $<HTMLInputElement>("input-me").value = "";
-  $("load-label").textContent = ready ? "" : "뇌를 깨우는 중…";
+  $("load-label").textContent = ready ? "" : L("뇌를 깨우는 중…", "Waking up the brain…");
   $<HTMLInputElement>("input-name").focus();
 }
 
@@ -485,7 +493,7 @@ $("naming").addEventListener("submit", (e) => {
   care.save(now);
   $("naming").hidden = true;
   applyNames();
-  if (!ready) $("load-label").textContent = `${charName()}의 뇌를 깨우는 중…`;
+  if (!ready) $("load-label").textContent = L(`${charName()}의 뇌를 깨우는 중…`, `Waking up ${charName()}'s brain…`);
   wakeUp();
 });
 if (!care.named) showNaming();
@@ -497,14 +505,14 @@ function giveFood(kind: FoodKind) {
   if (care.s.asleep) return say("쿨쿨…");
   if (!care.takeSnack(kind)) {
     const label = SNACKS[kind].label;
-    say(`${label}${hasBatchim(label) ? "이" : "가"} 없어…`);
+    say(L(`${label}${hasBatchim(label) ? "이" : "가"} 없어…`, `No ${label.toLowerCase()} left…`));
     togglePanel("shop-panel", true);
     return;
   }
   if (habitat.foods.length >= MAX_FOODS) habitat.foods.shift();
   habitat.addFoodInFront(controller.state, kind, 1);
   const snack = SNACKS[kind];
-  if (kind === "bitter" || kind === "salty") care.log(Date.now(), `${snack.label}${hasBatchim(snack.label) ? "을" : "를"} 줘 봤어요.`);
+  if (kind === "bitter" || kind === "salty") care.log(Date.now(), L(`${snack.label}${hasBatchim(snack.label) ? "을" : "를"} 줘 봤어요.`, `Offered a ${snack.label.toLowerCase()}.`));
 }
 
 /** 돌봄으로 하트를 얻고, 얻었으면 하트 파티클 */
@@ -522,16 +530,16 @@ function pet() {
   if (controller.wakeUp()) return;
   const line = care.on("petted", Date.now());
   say(line);
-  if (line !== "그만 좀 해!" && line !== "흥…") {
+  if (line !== PET_LINES.tooMuch && line !== PET_LINES.grumpy) {
     earn(1);
     care.thrillUp(0.2 + 0.3 * care.s.affection);
     rec("pets");
     if (care.s.totals.pets === 42) {
-      egg("pet-42", 42, "42번째 쓰다듬기", "삶, 우주, 그리고 모든 것의 답… 42번째 쓰다듬기야!");
+      egg("pet-42", 42, L("42번째 쓰다듬기", "The 42nd pat"), L("삶, 우주, 그리고 모든 것의 답… 42번째 쓰다듬기야!", "The answer to life, the universe and everything… that was pat number 42!"));
       burst(innerWidth / 2, innerHeight * 0.45, 20, ["💖"]);
     }
   }
-  if (line !== "그만~") {
+  {
     sfx.pet();
     const at = anchor();
     burst(at.x, at.y, 3);
@@ -577,7 +585,7 @@ function takePhoto() {
   void document.body.offsetWidth; // 애니메이션 다시 시작
   document.body.classList.add("flash");
   sfx.sparkle();
-  say("찰칵! 📷");
+  say(L("찰칵! 📷", "Click! 📷"));
   rec("photos");
 }
 
@@ -588,7 +596,7 @@ function toggleLights() {
 }
 
 function updateLightButton() {
-  $("btn-light").querySelector("em")!.textContent = care.s.lightsOn ? "불 끄기" : "불 켜기";
+  $("btn-light").querySelector("em")!.textContent = care.s.lightsOn ? L("불 끄기", "Lights off") : L("불 켜기", "Lights on");
 }
 
 type PanelId = "brain-panel" | "diary-panel" | "shop-panel" | "album-panel";
@@ -635,7 +643,7 @@ $("btn-clean").onclick = () => cleanUp();
 $("btn-talk").onclick = talk;
 const updateMute = () => {
   $("btn-mute").textContent = sfx.muted ? "🔇" : "🔊";
-  $("btn-mute").setAttribute("aria-label", sfx.muted ? "소리 켜기" : "소리 끄기");
+  $("btn-mute").setAttribute("aria-label", sfx.muted ? L("소리 켜기", "Unmute") : L("소리 끄기", "Mute"));
 };
 $("btn-mute").onclick = () => {
   sfx.setMuted(!sfx.muted);
@@ -674,10 +682,10 @@ $("sim-toggle").onclick = () => {
   simRunning = !simRunning;
   send({ type: simRunning ? "resume" : "pause" });
   $("sim-toggle").setAttribute("aria-pressed", String(simRunning));
-  $("sim-toggle").textContent = simRunning ? "시뮬 실행 중" : "시뮬 멈춤";
+  $("sim-toggle").textContent = simRunning ? L("시뮬 실행 중", "Sim running") : L("시뮬 멈춤", "Sim paused");
 };
 $("btn-restart").onclick = () => {
-  if (!confirm("지금까지의 애정과 일기가 모두 사라져요. 처음부터 다시 키울까요?")) return;
+  if (!confirm(L("지금까지의 애정과 일기가 모두 사라져요. 처음부터 다시 키울까요?", "All her love and your diary so far will be gone. Start over from the beginning?"))) return;
   care.reset(Date.now());
   togglePanel("diary-panel", false);
   showNaming();
@@ -695,7 +703,7 @@ window.addEventListener("keydown", (e) => {
   if (konami.push(e.key) && ready) {
     togglePanel("brain-panel", true);
     setTimeout(() => neural?.flash(), 400);
-    egg("konami", 30, "코나미 커맨드", "지금 내 뉴런… 13만 8천 개 다 켜졌어?!");
+    egg("konami", 30, L("코나미 커맨드", "Konami code"), L("지금 내 뉴런… 13만 8천 개 다 켜졌어?!", "Did all 138,000 of my neurons just light up?!"));
     return;
   }
   if (dialog.open || games.active) return;
@@ -734,7 +742,7 @@ document.addEventListener("visibilitychange", () => {
   lastTime = performance.now();
   if (!ready || !care.resume(Date.now())) return;
   const got = care.collectPending(Date.now());
-  if (got > 0) say(`기다리면서 하트 ${got}개 모았어!`, 3);
+  if (got > 0) say(L(`기다리면서 하트 ${got}개 모았어!`, `I saved up ${got} hearts while waiting!`), 3);
   showLetter(() => director.greetIfNeeded(Date.now()));
 });
 
@@ -783,7 +791,7 @@ function frameLoop(now: number) {
     else if (t > nextAmbient) {
       nextAmbient = t + 7 + Math.random() * 6;
       const s = care.s;
-      say(s.sulk > 0 ? (s.sulkWhy === "jealous" ? "…흥, 누구랑 있었는데" : "흥…") : s.hunger > 0.75 ? "배고파…" : s.sleepiness > 0.8 ? "졸려…" : care.cleanliness < 0.5 ? "방이 지저분해…" : s.mood < 0.3 ? "흥…" : s.mood > 0.5 && Math.random() < 0.6 ? personalize(mutter(s.stageSeen), { name: charName(), me: s.callMe || DEFAULT_NAMES.me }) : null);
+      say(s.sulk > 0 ? (s.sulkWhy === "jealous" ? L("…흥, 누구랑 있었는데", "…hmph, who were you with") : L("흥…", "Hmph…")) : s.hunger > 0.75 ? L("배고파…", "I'm hungry…") : s.sleepiness > 0.8 ? L("졸려…", "I'm sleepy…") : care.cleanliness < 0.5 ? L("방이 지저분해…", "The room is messy…") : s.mood < 0.3 ? L("흥…", "Hmph…") : s.mood > 0.5 && Math.random() < 0.6 ? personalize(mutter(s.stageSeen), { name: charName(), me: s.callMe || DEFAULT_NAMES.me }) : null);
     } else $("bubble").hidden = true;
   }
   const anchor = $("bubble").hidden ? null : body.bubbleAnchor();
@@ -820,7 +828,7 @@ function shopItem(
   label.append(strong, small);
   const tag = document.createElement("span");
   tag.className = "price";
-  tag.textContent = price === null ? "보유 중" : `💖 ${price}`;
+  tag.textContent = price === null ? L("보유 중", "Owned") : `💖 ${price}`;
   btn.append(icon, label, tag);
   btn.onclick = () => {
     onBuy();
@@ -839,7 +847,7 @@ function renderShop() {
     ...(Object.keys(SNACKS) as FoodKind[]).map((kind) => {
       const snack = SNACKS[kind];
       const price = SNACK_PRICE[kind];
-      return shopItem(snack.emoji, snack.label, `가진 개수 ${s.stock[kind]}개`, price, hearts < price, () => {
+      return shopItem(snack.emoji, snack.label, L(`가진 개수 ${s.stock[kind]}개`, `In stock: ${s.stock[kind]}`), price, hearts < price, () => {
         if (care.buySnack(kind)) sfx.choice();
       });
     }),
@@ -849,7 +857,7 @@ function renderShop() {
     ...(Object.keys(COSMETICS) as CosmeticId[]).map((id) => {
       const item = COSMETICS[id];
       const owned = s.owned.includes(id);
-      return shopItem(item.emoji, item.label, `${item.note} · 하트 적립 +${Math.round(item.bonus * 100)}%`, owned ? null : item.price, owned || hearts < item.price, () => {
+      return shopItem(item.emoji, item.label, L(`${item.note} · 하트 적립 +${Math.round(item.bonus * 100)}%`, `${item.note} · hearts +${Math.round(item.bonus * 100)}%`), owned ? null : item.price, owned || hearts < item.price, () => {
         if (care.buyCosmetic(id, Date.now())) {
           sfx.sparkle();
           body.setCosmetics(worn());
@@ -861,9 +869,9 @@ function renderShop() {
   );
 
   const avatars: [AvatarKind, string, string, string][] = [
-    ["girl", "🧑", "미소녀", "기본 VRM 모습"],
-    ["fly", "🪰", "진짜 초파리", "다리 6개로 걷고 앞다리로 그루밍해요"],
-    ["custom", "📁", "내 VRM 불러오기", "가진 VRM 파일로 모습 바꾸기"],
+    ["girl", "🧑", L("미소녀", "Anime girl"), L("기본 VRM 모습", "The default VRM look")],
+    ["fly", "🪰", L("진짜 초파리", "Real fruit fly"), L("다리 6개로 걷고 앞다리로 그루밍해요", "Walks on six legs and grooms with her forelegs")],
+    ["custom", "📁", L("내 VRM 불러오기", "Load my VRM"), L("가진 VRM 파일로 모습 바꾸기", "Use your own VRM file")],
   ];
   $("shop-avatar").replaceChildren(
     ...avatars.map(([kind, emoji, name, note]) => {
@@ -872,18 +880,18 @@ function renderShop() {
         if (kind === "custom") $<HTMLInputElement>("vrm-file").click();
         else void applyAvatar(kind).then(() => renderShop());
       });
-      item.querySelector(".price")!.textContent = current ? "사용 중" : kind === "custom" ? "파일 선택" : "바꾸기";
+      item.querySelector(".price")!.textContent = current ? L("사용 중", "In use") : kind === "custom" ? L("파일 선택", "Choose file") : L("바꾸기", "Switch");
       return item;
     }),
   );
 
-  const giftNote = s.giftDay === Math.floor(s.gameHours / 24) ? "오늘은 이미 선물했어요" : "하루 한 번, 애정이 조금 더 오릅니다";
+  const giftNote = s.giftDay === Math.floor(s.gameHours / 24) ? L("오늘은 이미 선물했어요", "Already gave a gift today") : L("하루 한 번, 애정이 조금 더 오릅니다", "Once a day, her love grows a little more");
   $("shop-gift").replaceChildren(
-    shopItem("🎁", "선물 상자", giftNote, GIFT.price, !care.canGift, () => {
+    shopItem("🎁", L("선물 상자", "Gift box"), giftNote, GIFT.price, !care.canGift, () => {
       if (care.giveGift(Date.now())) {
         care.thrillUp(0.8);
         sfx.levelUp();
-        say("이거… 나 주는 거야? 헤헤♡", 3);
+        say(L("이거… 나 주는 거야? 헤헤♡", "This… is for me? Hehe♡"), 3);
         burst(innerWidth / 2, innerHeight * 0.5, 8, ["♥", "🎁"]);
       }
     }),
@@ -905,9 +913,9 @@ function updateUi() {
   setGauge("g-mood", s.mood);
   setGauge("g-clean", care.cleanliness);
   setGauge("g-love", s.affection);
-  $("days").textContent = `함께한 지 ${care.daysTogether()}일`;
+  $("days").textContent = L(`함께한 지 ${care.daysTogether()}일`, `Day ${care.daysTogether()} together`);
   $("heart-count").textContent = String(Math.floor(care.s.hearts));
-  $("stage").textContent = `💞 ${STAGES[care.s.stageSeen].name}${care.s.title ? ` · 🍓${care.s.title}` : ""}${care.s.sulk > 0 ? " · 💢삐짐" : ""}`;
+  $("stage").textContent = `💞 ${STAGES[care.s.stageSeen].name}${care.s.title ? ` · 🍓${care.s.title}` : ""}${care.s.sulk > 0 ? L(" · 💢삐짐", " · 💢Sulking") : ""}`;
 
   const state = controller.state;
   const label = BEHAVIOR_LABEL[Controller.displayBehavior(state)];
@@ -938,10 +946,10 @@ function updateUi() {
     $("stat-mean").textContent = `${lastFrame.meanRate.toFixed(3)} Hz`;
     $("stat-spiking").textContent = lastFrame.spikingNeurons.toLocaleString();
     $("stat-active").textContent = lastFrame.activeNeurons.toLocaleString();
-    $("stat-speed").textContent = simRunning ? `${simSpeed.toFixed(2)}×` : "멈춤";
+    $("stat-speed").textContent = simRunning ? `${simSpeed.toFixed(2)}×` : L("멈춤", "Paused");
     $("top-dn").textContent = lastFrame.topLabeled.length
-      ? `활발: ${lastFrame.topLabeled.map(([n, hz]) => `${n} ${hz.toFixed(0)}`).join(" · ")}`
-      : "활발한 하강뉴런 없음";
+      ? `${L("활발", "Active")}: ${lastFrame.topLabeled.map(([n, hz]) => `${n} ${hz.toFixed(0)}`).join(" · ")}`
+      : L("활발한 하강뉴런 없음", "No active descending neurons");
   }
 }
 
@@ -949,11 +957,11 @@ function renderDiary() {
   const now = Date.now();
   const s = care.s;
   const stats = [
-    ["함께한 날", `${care.daysTogether()}일`],
-    ["관계", STAGES[s.stageSeen].name],
-    ["애정", `${Math.round(s.affection * 100)}%`],
-    ["기분", `${Math.round(s.mood * 100)}%`],
-    ["청결", `${Math.round(care.cleanliness * 100)}%`],
+    [L("함께한 날", "Days together"), L(`${care.daysTogether()}일`, `${care.daysTogether()}`)],
+    [L("관계", "Relationship"), STAGES[s.stageSeen].name],
+    [L("애정", "Love"), `${Math.round(s.affection * 100)}%`],
+    [L("기분", "Mood"), `${Math.round(s.mood * 100)}%`],
+    [L("청결", "Clean"), `${Math.round(care.cleanliness * 100)}%`],
   ].map(([k, v]) => {
     const div = document.createElement("div");
     const dt = document.createElement("dt");
@@ -973,26 +981,26 @@ function renderDiary() {
   const hint = document.createElement("p");
   hint.className = "note";
   hint.textContent =
-    `오늘 모은 마음 ${"♥".repeat(hearts)}${"♡".repeat(5 - hearts)}` +
+    `${L("오늘 모은 마음", "Love gained today")} ${"♥".repeat(hearts)}${"♡".repeat(5 - hearts)}` +
     (next
-      ? ` · 다음 단계 '${next.name}': ` +
+      ? L(` · 다음 단계 '${next.name}': `, ` · Next stage '${next.name}': `) +
         [
-          next.affection > 0 ? `애정 ${Math.ceil(next.affection * 100)}% 더` : "애정 충분",
-          next.days > 0 ? `함께한 날 ${next.days}일 더` : "함께한 날 충분",
-          next.moodOk ? "기분 좋음" : "기분이 좋을 때",
+          next.affection > 0 ? L(`애정 ${Math.ceil(next.affection * 100)}% 더`, `${Math.ceil(next.affection * 100)}% more love`) : L("애정 충분", "enough love"),
+          next.days > 0 ? L(`함께한 날 ${next.days}일 더`, `${next.days} more days together`) : L("함께한 날 충분", "enough days together"),
+          next.moodOk ? L("기분 좋음", "good mood") : L("기분이 좋을 때", "when she's in a good mood"),
         ].join(", ")
-      : " · 이미 연인이에요 💞");
+      : L(" · 이미 연인이에요 💞", " · You are already lovers 💞"));
   $("diary-stats").after(hint);
 
   const tastes = Object.entries(care.s.tastes) as [FoodKind, number][];
   const taste = document.createElement("p");
   taste.className = "note";
   taste.textContent = tastes.length
-    ? "뇌가 알려 준 취향 (먹는 동안 MN9 최고 발화율) · " +
+    ? L("뇌가 알려 준 취향 (먹는 동안 MN9 최고 발화율) · ", "Tastes her brain told you (peak MN9 rate while eating) · ") +
       tastes.sort((a, b) => b[1] - a[1])
         .map(([kind, hz]) => `${SNACKS[kind].emoji} ${SNACKS[kind].label} ${hz.toFixed(0)} Hz${hz >= 60 ? " ♥" : hz >= 20 ? " ♡" : " ✖"}`)
         .join(" · ")
-    : "아직 아무 간식도 맛보지 않았어요. 간식을 주면 뇌 반응으로 취향을 알 수 있어요.";
+    : L("아직 아무 간식도 맛보지 않았어요. 간식을 주면 뇌 반응으로 취향을 알 수 있어요.", "She hasn't tasted any snacks yet. Give her one and her brain will tell you what she likes.");
   $("diary-stats").after(taste);
 
   const list = document.createElement("ul");
@@ -1018,7 +1026,7 @@ function renderDiary() {
   );
   const heading = document.createElement("p");
   heading.className = "note";
-  heading.textContent = `업적 ${s.unlocked.length}/${ACHIEVEMENTS.length} · 하트 적립 ×${care.heartBonus.toFixed(2)}`;
+  heading.textContent = L(`업적 ${s.unlocked.length}/${ACHIEVEMENTS.length} · 하트 적립 ×${care.heartBonus.toFixed(2)}`, `Achievements ${s.unlocked.length}/${ACHIEVEMENTS.length} · hearts ×${care.heartBonus.toFixed(2)}`);
   $("diary-stats").after(heading, list);
 
   const today = new Date(now).toDateString();
@@ -1052,7 +1060,7 @@ document.addEventListener("visibilitychange", () => {
   if (IS_DESKTOP || !ready || !hiddenAt || away < JEALOUS_AFTER_MS || away > 6 * 3.6e6) return;
   if (care.s.asleep || care.s.stageSeen < 2 || care.s.sulk > 0) return;
   care.sulkUp(0.5, now, "jealous");
-  setTimeout(() => say("…다른 창에서 누구 만나고 왔어?", 4), 600);
+  setTimeout(() => say(L("…다른 창에서 누구 만나고 왔어?", "…who were you seeing in that other window?"), 4), 600);
 });
 
 // ---------------------------------------------------------------- 미니게임
@@ -1088,14 +1096,14 @@ function endGame(r: GameResult) {
       care.thrillUp(0.6);
       sfx.levelUp();
       burst(...center(), 12, ["💓", "💖"]);
-      say(care.s.stageSeen >= 3 ? "잡혔다… 헤헤, 두근거렸어♡" : "앗, 잡혔다! …생각보다 조심스럽네.", 3);
-      care.log(now, `🤚 살금살금 손 뻗기 성공! Giant Fiber를 참아 냈어요${reward ? ` (+${reward} 하트)` : ""}.`);
+      say(care.s.stageSeen >= 3 ? L("잡혔다… 헤헤, 두근거렸어♡", "You got me… hehe, my heart was racing♡") : L("앗, 잡혔다! …생각보다 조심스럽네.", "Eek, caught! …you're gentler than I thought."), 3);
+      care.log(now, L(`🤚 살금살금 손 뻗기 성공! Giant Fiber를 참아 냈어요${reward ? ` (+${reward} 하트)` : ""}.`, `🤚 Sneaky hand success! Her Giant Fiber held still${reward ? ` (+${reward} hearts)` : ""}.`));
       rec("pets");
     } else if (r.reason === "escaped") {
       care.bump(-0.05);
-      say("휙! 너무 빨랐어!", 3);
-      care.log(now, "🤚 손을 뻗었더니 Giant Fiber가 켜져서 도망갔어요.");
-    } else say("…손은 왜 멈춘 거야?", 3);
+      say(L("휙! 너무 빨랐어!", "Whoosh! Too fast!"), 3);
+      care.log(now, L("🤚 손을 뻗었더니 Giant Fiber가 켜져서 도망갔어요.", "🤚 Reached out, her Giant Fiber fired and she escaped."));
+    } else say(L("…손은 왜 멈춘 거야?", "…why did your hand stop?"), 3);
   } else {
     today.games = (today.games ?? 0) + 1;
     const reward = paid ? Math.min(20, r.berries) : 0;
@@ -1103,8 +1111,8 @@ function endGame(r: GameResult) {
     care.s.hearts += reward;
     care.s.stock.sweet += kept;
     if (r.berries > 0) burst(...center(), Math.min(12, r.berries), ["🍓"]);
-    say(r.berries >= 10 ? `딸기 ${r.berries}개! 나 주는 거지?` : r.berries > 0 ? `딸기 ${r.berries}개 받았다!` : "하나도 못 받았어…", 3);
-    care.log(now, `🧺 딸기 받기: ${r.berries}개${reward ? ` (+${reward} 하트)` : ""}${kept ? `, 딸기 ${kept}개 보관` : ""}.`);
+    say(r.berries >= 10 ? L(`딸기 ${r.berries}개! 나 주는 거지?`, `${r.berries} strawberries! They're for me, right?`) : r.berries > 0 ? L(`딸기 ${r.berries}개 받았다!`, `Caught ${r.berries} strawberries!`) : L("하나도 못 받았어…", "Didn't catch a single one…"), 3);
+    care.log(now, L(`🧺 딸기 받기: ${r.berries}개${reward ? ` (+${reward} 하트)` : ""}${kept ? `, 딸기 ${kept}개 보관` : ""}.`, `🧺 Strawberry catch: ${r.berries}${reward ? ` (+${reward} hearts)` : ""}${kept ? `, ${kept} strawberries stocked` : ""}.`));
   }
 }
 
@@ -1115,13 +1123,13 @@ function renderAlbum() {
   const yesterday = localDay(now - 86_400_000);
   const streak = s.attend.last === localDay(now) || s.attend.last === yesterday ? s.attend.streak : 0;
   const stamped = s.attend.last === localDay(now) ? ((streak - 1) % ATTEND_REWARDS.length) + 1 : streak % ATTEND_REWARDS.length;
-  $("album-streak").textContent = `연속 ${streak}일`;
+  $("album-streak").textContent = L(`연속 ${streak}일`, `${streak}-day streak`);
   $("album-attend").replaceChildren(
     ...ATTEND_REWARDS.map((reward, i) => {
       const span = document.createElement("span");
       span.className = i < stamped ? "on" : "";
       span.textContent = i < stamped ? "✔" : `${reward}💖`;
-      span.title = `${i + 1}일째`;
+      span.title = L(`${i + 1}일째`, `Day ${i + 1}`);
       return span;
     }),
   );
@@ -1145,7 +1153,7 @@ function renderAlbum() {
   $("album-memories").replaceChildren(
     ...MEMORIES.map((m) => {
       const seen = s.memories.includes(m.id);
-      const item = shopItem(seen ? m.emoji : "🔒", seen ? m.title : "???", seen ? "눌러서 다시 보기" : "아직 보지 못한 장면", null, !seen, () => {
+      const item = shopItem(seen ? m.emoji : "🔒", seen ? m.title : "???", seen ? L("눌러서 다시 보기", "Tap to replay") : L("아직 보지 못한 장면", "Not seen yet"), null, !seen, () => {
         togglePanel("album-panel", false);
         director.replay(m.id);
       });
@@ -1156,7 +1164,7 @@ function renderAlbum() {
 
   const photos = $("album-photos");
   photos.replaceChildren();
-  if (!s.album.length) photos.textContent = "아직 찍은 사진이 없어요. 📷 버튼으로 찍어 보세요.";
+  if (!s.album.length) photos.textContent = L("아직 찍은 사진이 없어요. 📷 버튼으로 찍어 보세요.", "No photos yet. Take one with the 📷 button.");
   for (const t of s.album) {
     const img = new Image();
     img.alt = new Date(t).toLocaleString("ko-KR");
@@ -1172,3 +1180,12 @@ function renderAlbum() {
 
 // ---------------------------------------------------------------- 데스크톱
 if (IS_DESKTOP) void setupDesktop(save);
+
+// ---------------------------------------------------------------- 언어
+for (const btn of document.querySelectorAll<HTMLButtonElement>("[data-lang]")) {
+  btn.classList.toggle("on", btn.dataset.lang === LANG);
+  btn.onclick = () => {
+    save();
+    setLang(btn.dataset.lang as Lang);
+  };
+}

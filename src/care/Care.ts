@@ -1,6 +1,7 @@
 // 다마고치식 돌봄 상태. 뇌 시뮬레이션 밖의 "게임 상태"다.
 // 배고픔만 뇌에 닿는다(배고플수록 당 GRN 입력이 세짐, Habitat.sense). 나머지는 행동 선택·표정·말풍선에 쓴다.
 import { type Letter, writeLetter } from "../story/away.ts";
+import { L } from "../i18n.ts";
 import { hasBatchim } from "../story/personalize.ts";
 import { hourOf, sleepinessFactor } from "../world/Clock.ts";
 import { ROOM_HALF, SNACKS, insideBed, type FoodKind } from "../world/Habitat.ts";
@@ -22,22 +23,24 @@ export interface Mess {
  * 애정(min) + 함께한 날(minDays)을 채우고, 그 순간 기분이 좋아야(MOOD_TO_ADVANCE) 다음 단계로 간다.
  */
 export const STAGES = [
-  { name: "낯섦", min: 0, minDays: 0 },
-  { name: "친구", min: 0.2, minDays: 1 },
-  { name: "호감", min: 0.45, minDays: 3 },
-  { name: "두근두근", min: 0.7, minDays: 5 },
-  { name: "연인", min: 0.92, minDays: 7 },
+  { name: L("낯섦", "Strangers"), min: 0, minDays: 0 },
+  { name: L("친구", "Friends"), min: 0.2, minDays: 1 },
+  { name: L("호감", "Crush"), min: 0.45, minDays: 3 },
+  { name: L("두근두근", "Heart-fluttering"), min: 0.7, minDays: 5 },
+  { name: L("연인", "Lovers"), min: 0.92, minDays: 7 },
 ] as const;
 export const MOOD_TO_ADVANCE = 0.6;
+/** 쓰다듬기를 거절할 때의 대사 (부르는 쪽이 보상을 주지 않으려고 비교한다) */
+export const PET_LINES = { tooMuch: L("그만 좀 해!", "Stop it already!"), grumpy: L("흥…", "Hmph…") };
 /** 하루(게임 시간 24h)에 오를 수 있는 애정 상한 */
 export const DAILY_AFFECTION_CAP = 0.06;
 
 /** 상점에서 파는 꾸미기 아이템 */
 export const COSMETICS = {
-  ribbon: { label: "리본", emoji: "🎀", price: 40, bonus: 0.05, note: "머리에 다는 빨간 리본" },
-  scarf: { label: "목도리", emoji: "🧣", price: 60, bonus: 0.05, note: "포근한 목도리" },
-  plant: { label: "화분", emoji: "🪴", price: 30, bonus: 0.1, note: "창가에 두는 화분" },
-  frame: { label: "액자", emoji: "🖼️", price: 50, bonus: 0.15, note: "찍은 사진이 걸리는 액자" },
+  ribbon: { label: L("리본", "Ribbon"), emoji: "🎀", price: 40, bonus: 0.05, note: L("머리에 다는 빨간 리본", "A red ribbon for her head") },
+  scarf: { label: L("목도리", "Scarf"), emoji: "🧣", price: 60, bonus: 0.05, note: L("포근한 목도리", "A cozy scarf") },
+  plant: { label: L("화분", "Plant"), emoji: "🪴", price: 30, bonus: 0.1, note: L("창가에 두는 화분", "A potted plant by the window") },
+  frame: { label: L("액자", "Picture frame"), emoji: "🖼️", price: 50, bonus: 0.15, note: L("찍은 사진이 걸리는 액자", "Shows the photo you took") },
 } as const;
 export type CosmeticId = keyof typeof COSMETICS;
 
@@ -75,18 +78,18 @@ export interface Achievement {
 
 /** 업적: 달성하면 하트를 준다 */
 export const ACHIEVEMENTS: Achievement[] = [
-  { id: "first-meal", emoji: "🍓", name: "첫 식사", note: "간식을 처음 먹었어요", reward: 10, done: (c) => c.s.totals.meals >= 1 },
-  { id: "gourmet", emoji: "👅", name: "미식가", note: "간식 네 가지를 모두 맛보기", reward: 30,
+  { id: "first-meal", emoji: "🍓", name: L("첫 식사", "First meal"), note: L("간식을 처음 먹었어요", "Ate her first snack"), reward: 10, done: (c) => c.s.totals.meals >= 1 },
+  { id: "gourmet", emoji: "👅", name: L("미식가", "Gourmet"), note: L("간식 네 가지를 모두 맛보기", "Taste four different snacks"), reward: 30,
     done: (c) => Object.keys(c.s.tastes).length >= 4 },
-  { id: "first-sleep", emoji: "💤", name: "잘 자", note: "불을 꺼서 재우기", reward: 10, done: (c) => c.s.totals.sleeps >= 1 },
-  { id: "groomer", emoji: "✋", name: "손이 많이 가", note: "쓰다듬어서 더듬이 손질 10번 보기", reward: 20,
+  { id: "first-sleep", emoji: "💤", name: L("잘 자", "Good night"), note: L("불을 꺼서 재우기", "Turn off the lights so she sleeps"), reward: 10, done: (c) => c.s.totals.sleeps >= 1 },
+  { id: "groomer", emoji: "✋", name: L("손이 많이 가", "High maintenance"), note: L("쓰다듬어서 더듬이 손질 10번 보기", "See her groom her antennae 10 times"), reward: 20,
     done: (c) => c.s.totals.grooms >= 10 },
-  { id: "cleaner", emoji: "🧹", name: "청소왕", note: "얼룩 20개 치우기", reward: 25, done: (c) => c.s.totals.cleans >= 20 },
-  { id: "chatty", emoji: "💬", name: "수다쟁이", note: "대화 20번 하기", reward: 25, done: (c) => c.s.totals.talks >= 20 },
-  { id: "photographer", emoji: "📷", name: "사진사", note: "사진 5장 찍기", reward: 20, done: (c) => c.s.totals.photos >= 5 },
-  { id: "friend", emoji: "💞", name: "친구가 되다", note: "관계 '친구' 도달", reward: 30, done: (c) => c.s.stageSeen >= 1 },
-  { id: "lover", emoji: "💖", name: "연인이 되다", note: "관계 '연인' 도달", reward: 100, done: (c) => c.s.stageSeen >= 4 },
-  { id: "week", emoji: "📅", name: "일주일", note: "함께한 지 7일", reward: 50, done: (c) => c.daysTogether() >= 7 },
+  { id: "cleaner", emoji: "🧹", name: L("청소왕", "Clean freak"), note: L("얼룩 20개 치우기", "Clean up 20 messes"), reward: 25, done: (c) => c.s.totals.cleans >= 20 },
+  { id: "chatty", emoji: "💬", name: L("수다쟁이", "Chatterbox"), note: L("대화 20번 하기", "Talk 20 times"), reward: 25, done: (c) => c.s.totals.talks >= 20 },
+  { id: "photographer", emoji: "📷", name: L("사진사", "Photographer"), note: L("사진 5장 찍기", "Take 5 photos"), reward: 20, done: (c) => c.s.totals.photos >= 5 },
+  { id: "friend", emoji: "💞", name: L("친구가 되다", "Friends at last"), note: L("관계 '친구' 도달", "Reach 'Friends'"), reward: 30, done: (c) => c.s.stageSeen >= 1 },
+  { id: "lover", emoji: "💖", name: L("연인이 되다", "Lovers at last"), note: L("관계 '연인' 도달", "Reach 'Lovers'"), reward: 100, done: (c) => c.s.stageSeen >= 4 },
+  { id: "week", emoji: "📅", name: L("일주일", "One week"), note: L("함께한 지 7일", "7 days together"), reward: 50, done: (c) => c.daysTogether() >= 7 },
 ];
 
 /** 오늘 하루 기록 (뇌 출력 기반 대화에 쓴다) */
@@ -298,14 +301,14 @@ export class Care {
         now,
       );
     }
-    const away = hours >= 1 ? `${Math.floor(hours)}시간` : `${Math.round(hours * 60)}분`;
+    const away = hours >= 1 ? L(`${Math.floor(hours)}시간`, `${Math.floor(hours)} h`) : L(`${Math.round(hours * 60)}분`, `${Math.round(hours * 60)} min`);
     const notes = [
-      this.s.hunger > 0.85 && "배가 많이 고파 보여요.",
-      this.cleanliness < 0.5 && "방에 먼지가 쌓였어요.",
-      lonely > 0 && "오래 혼자 있어서 조금 서운해해요.",
-      wasAsleep && !this.s.asleep && "그사이 푹 자고 일어났어요.",
+      this.s.hunger > 0.85 && L("배가 많이 고파 보여요.", "She looks very hungry."),
+      this.cleanliness < 0.5 && L("방에 먼지가 쌓였어요.", "Dust has piled up in the room."),
+      lonely > 0 && L("오래 혼자 있어서 조금 서운해해요.", "She was alone a long time and feels a bit hurt."),
+      wasAsleep && !this.s.asleep && L("그사이 푹 자고 일어났어요.", "She had a good sleep in the meantime."),
     ].filter(Boolean);
-    this.log(now, [`${away} 동안 기다렸어요.`, ...notes].join(" "));
+    this.log(now, [L(`${away} 동안 기다렸어요.`, `She waited ${away}.`), ...notes].join(" "));
   }
 
   /** realSec 초만큼 시간 경과 (배속 적용). hour 는 그 시점의 실제 시각 (생체시계) */
@@ -350,7 +353,7 @@ export class Care {
   /** 삐지게 한다 (이미 더 삐져 있으면 그대로) */
   sulkUp(level: number, now: number, why: "away" | "jealous"): void {
     if (level <= this.s.sulk) return;
-    if (this.s.sulk === 0) this.log(now, why === "jealous" ? "💢 다른 창을 오래 보고 왔더니 질투했어요." : "💢 오래 혼자 둬서 삐졌어요.");
+    if (this.s.sulk === 0) this.log(now, why === "jealous" ? L("💢 다른 창을 오래 보고 왔더니 질투했어요.", "💢 You looked at another window too long and she got jealous.") : L("💢 오래 혼자 둬서 삐졌어요.", "💢 She sulks after being left alone so long."));
     this.s.sulk = clamp01(level);
     this.s.sulkWhy = why;
   }
@@ -361,7 +364,7 @@ export class Care {
     this.s.sulk = Math.max(0, this.s.sulk - amount);
     if (this.s.sulk > 0) return false;
     this.bump(0.15);
-    this.log(now, "삐진 게 풀렸어요. 이번만 봐준대요.");
+    this.log(now, L("삐진 게 풀렸어요. 이번만 봐준대요.", "She stopped sulking. Just this once, she says."));
     return true;
   }
 
@@ -383,7 +386,7 @@ export class Care {
       if (this.s.unlocked.includes(a.id) || !a.done(this)) continue;
       this.s.unlocked.push(a.id);
       this.s.hearts += a.reward;
-      this.log(now, `업적 달성: ${a.emoji} ${a.name} (+${a.reward} 하트)`);
+      this.log(now, L(`업적 달성: ${a.emoji} ${a.name} (+${a.reward} 하트)`, `Achievement: ${a.emoji} ${a.name} (+${a.reward} hearts)`));
       got.push(a);
     }
     return got;
@@ -394,7 +397,7 @@ export class Care {
     if (this.s.eggs.includes(id)) return false;
     this.s.eggs.push(id);
     this.s.hearts += reward;
-    this.log(now, `🥚 이스터에그 발견: ${note} (+${reward} 하트)`);
+    this.log(now, L(`🥚 이스터에그 발견: ${note} (+${reward} 하트)`, `🥚 Easter egg found: ${note} (+${reward} hearts)`));
     return true;
   }
 
@@ -404,7 +407,7 @@ export class Care {
     if (got <= 0) return 0;
     this.s.hearts += got;
     this.s.pendingHearts -= got;
-    this.log(now, `기다리는 동안 하트 ${got}개를 모아 뒀어요.`);
+    this.log(now, L(`기다리는 동안 하트 ${got}개를 모아 뒀어요.`, `She saved ${got} hearts while waiting.`));
     return got;
   }
 
@@ -434,7 +437,7 @@ export class Care {
   buyCosmetic(id: CosmeticId, now: number): boolean {
     if (this.s.owned.includes(id) || !this.spend(COSMETICS[id].price)) return false;
     this.s.owned.push(id);
-    this.log(now, `${COSMETICS[id].emoji} ${COSMETICS[id].label}${hasBatchim(COSMETICS[id].label) ? "을" : "를"} 샀어요.`);
+    this.log(now, L(`${COSMETICS[id].emoji} ${COSMETICS[id].label}${hasBatchim(COSMETICS[id].label) ? "을" : "를"} 샀어요.`, `${COSMETICS[id].emoji} Bought a ${COSMETICS[id].label.toLowerCase()}.`));
     return true;
   }
 
@@ -445,7 +448,7 @@ export class Care {
     if (this.s.giftDay === day || !this.spend(GIFT.price)) return false;
     this.s.giftDay = day;
     this.bump(GIFT.mood, GIFT.affection);
-    this.log(now, "선물을 줬어요. 아주 좋아했어요 🎁");
+    this.log(now, L("선물을 줬어요. 아주 좋아했어요 🎁", "Gave her a gift. She loved it 🎁"));
     this.soothe(1, now);
     return true;
   }
@@ -497,7 +500,7 @@ export class Care {
   markStageSeen(stage: number, now: number): void {
     if (stage <= this.s.stageSeen) return;
     this.s.stageSeen = stage;
-    this.log(now, `관계가 '${STAGES[stage].name}'(으)로 깊어졌어요 💞`);
+    this.log(now, L(`관계가 '${STAGES[stage].name}'(으)로 깊어졌어요 💞`, `Your relationship grew to '${STAGES[stage].name}' 💞`));
   }
 
   /** 오늘 기록. 날짜가 바뀌었으면 새로 시작 */
@@ -561,13 +564,13 @@ export class Care {
     const before = s.messes.length;
     s.messes = id === undefined ? [] : s.messes.filter((m) => m.id !== id);
     const removed = before - s.messes.length;
-    if (!removed) return "이미 깨끗해!";
+    if (!removed) return L("이미 깨끗해!", "Already clean!");
     this.bump(0.04 * removed, 0.004 * removed);
     if (!s.messes.length) {
-      this.log(now, "방을 깨끗하게 청소해 줬어요.");
-      return "반짝반짝✨";
+      this.log(now, L("방을 깨끗하게 청소해 줬어요.", "Cleaned the room spotless."));
+      return L("반짝반짝✨", "Sparkly✨");
     }
-    return "고마워~";
+    return L("고마워~", "Thanks~");
   }
 
   /** 간식을 amount 개(0-1) 만큼 먹음. 채워지는 양은 간식마다 다르다 */
@@ -593,49 +596,49 @@ export class Care {
       case "ate":
         // 배고플 때 준 밥이어야 마음이 움직인다. 무엇을 먹었는지는 부르는 쪽이 일기에 남긴다
         this.bump(0.15, s.hunger > 0.5 ? 0.012 : 0);
-        return "냠냠";
+        return L("냠냠", "Nom nom");
       case "full":
-        return "배불러~";
+        return L("배불러~", "I'm full~");
       case "bitter":
         this.bump(-0.25, -0.04);
-        this.log(now, "쓴 버섯을 맛보고 뒷걸음쳤어요. 조금 원망하는 눈치예요.");
-        return "우웩…";
+        this.log(now, L("쓴 버섯을 맛보고 뒷걸음쳤어요. 조금 원망하는 눈치예요.", "She tasted the bitter mushroom and backed away. She looks a little resentful."));
+        return L("우웩…", "Blech…");
       case "scared":
         this.bump(-0.3, -0.05);
-        this.log(now, "깜짝 놀라서 뛰어올랐어요. 한동안 경계할 것 같아요.");
-        return "꺅!";
+        this.log(now, L("깜짝 놀라서 뛰어올랐어요. 한동안 경계할 것 같아요.", "She jumped in fright. She'll be wary for a while."));
+        return L("꺅!", "Eek!");
       case "woken":
         s.asleep = false;
         this.bump(-0.2, -0.03);
-        this.log(now, "자다가 깼어요. 기분이 좋지 않아요.");
-        return "으응… 왜 깨워";
+        this.log(now, L("자다가 깼어요. 기분이 좋지 않아요.", "She was woken up. She's not happy."));
+        return L("으응… 왜 깨워", "Mmh… why'd you wake me");
       case "petted": {
         this.petTimes = [...this.petTimes.filter((t) => now - t < 20_000), now];
         if (this.petTimes.length > 3) {
           this.bump(-0.08, -0.02);
-          return "그만 좀 해!";
+          return PET_LINES.tooMuch;
         }
         if (s.sulk > 0) {
           this.bump(0.03);
-          return this.soothe(0.2, now) ? "…이번만 봐줄게" : "흥, 그런다고 안 풀려";
+          return this.soothe(0.2, now) ? L("…이번만 봐줄게", "…just this once, okay") : L("흥, 그런다고 안 풀려", "Hmph, that won't fix it");
         }
         // 기분이 나쁠 때는 손을 탄다
         if (s.mood < 0.4) {
           this.bump(-0.02);
-          return "흥…";
+          return PET_LINES.grumpy;
         }
         this.bump(0.08, 0.006);
-        if (this.petTimes.length === 1) this.log(now, "쓰다듬어 줬어요.");
-        return this.s.stageSeen >= 3 ? "헤헤♡" : this.s.stageSeen >= 1 ? "헤헤" : "…";
+        if (this.petTimes.length === 1) this.log(now, L("쓰다듬어 줬어요.", "Petted her."));
+        return this.s.stageSeen >= 3 ? L("헤헤♡", "Hehe♡") : this.s.stageSeen >= 1 ? L("헤헤", "Hehe") : "…";
       }
       case "sleep":
         s.asleep = true;
-        this.log(now, "침대에서 잠들었어요.");
+        this.log(now, L("침대에서 잠들었어요.", "Fell asleep in bed."));
         return "💤";
       case "wake":
         s.asleep = false;
-        this.log(now, "잘 자고 일어났어요.");
-        return "잘 잤다~";
+        this.log(now, L("잘 자고 일어났어요.", "Woke up after a good sleep."));
+        return L("잘 잤다~", "Slept well~");
     }
   }
 
@@ -647,13 +650,13 @@ export class Care {
     const first = !this.named;
     this.s.name = name;
     this.s.callMe = callMe;
-    if (first) this.log(now, `낯선 방에 ${name}${hasBatchim(name) ? "이" : "가"} 왔어요. 아직 경계하는 눈치예요.`);
+    if (first) this.log(now, L(`낯선 방에 ${name}${hasBatchim(name) ? "이" : "가"} 왔어요. 아직 경계하는 눈치예요.`, `${name} arrived in a strange room. She still seems wary.`));
   }
 
   setLights(on: boolean, now: number): void {
     if (this.s.lightsOn === on) return;
     this.s.lightsOn = on;
-    this.log(now, on ? "불을 켰어요." : "불을 껐어요.");
+    this.log(now, on ? L("불을 켰어요.", "Turned on the lights.") : L("불을 껐어요.", "Turned off the lights."));
   }
 
   log(now: number, text: string): void {

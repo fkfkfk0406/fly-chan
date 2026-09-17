@@ -1,4 +1,5 @@
 // 매일 돌아오게 만드는 것: 연속 출석 보상과 오늘의 부탁 3개
+import { L } from "../i18n.ts";
 import { type Care, type Totals, localDay } from "./Care.ts";
 
 /** 연속 출석 n일째 보상 (7일마다 반복) */
@@ -12,13 +13,13 @@ export interface Quest {
 }
 
 export const QUEST_POOL: Quest[] = [
-  { id: "pets", goal: 5, label: "5번 쓰다듬어 주기", reward: 10 },
-  { id: "meals", goal: 3, label: "간식 3번 먹이기", reward: 10 },
-  { id: "talks", goal: 3, label: "3번 대화하기", reward: 10 },
-  { id: "cleans", goal: 3, label: "얼룩 3개 치우기", reward: 10 },
-  { id: "photos", goal: 1, label: "사진 한 장 찍기", reward: 8 },
-  { id: "grooms", goal: 2, label: "더듬이 손질 2번 보기", reward: 12 },
-  { id: "sleeps", goal: 1, label: "불 끄고 재우기", reward: 10 },
+  { id: "pets", goal: 5, label: L("5번 쓰다듬어 주기", "Pet her 5 times"), reward: 10 },
+  { id: "meals", goal: 3, label: L("간식 3번 먹이기", "Feed her 3 snacks"), reward: 10 },
+  { id: "talks", goal: 3, label: L("3번 대화하기", "Talk 3 times"), reward: 10 },
+  { id: "cleans", goal: 3, label: L("얼룩 3개 치우기", "Clean 3 messes"), reward: 10 },
+  { id: "photos", goal: 1, label: L("사진 한 장 찍기", "Take a photo"), reward: 8 },
+  { id: "grooms", goal: 2, label: L("더듬이 손질 2번 보기", "See her groom twice"), reward: 12 },
+  { id: "sleeps", goal: 1, label: L("불 끄고 재우기", "Put her to bed"), reward: 10 },
 ];
 export const QUESTS_PER_DAY = 3;
 export const ALL_QUESTS_BONUS = 20;
@@ -32,7 +33,7 @@ export function checkIn(care: Care, now: number): { streak: number; reward: numb
   a.last = today;
   const reward = ATTEND_REWARDS[(a.streak - 1) % ATTEND_REWARDS.length];
   care.s.hearts += reward;
-  care.log(now, `📅 출석 ${a.streak}일째 (+${reward} 하트)`);
+  care.log(now, L(`📅 출석 ${a.streak}일째 (+${reward} 하트)`, `📅 Check-in day ${a.streak} (+${reward} hearts)`));
   return { streak: a.streak, reward };
 }
 
@@ -74,7 +75,7 @@ export function claimQuests(care: Care, now: number): { done: Quest[]; bonus: nu
     if (!st.done || st.claimed) continue;
     care.s.quests.claimed.push(st.quest.id);
     care.s.hearts += st.quest.reward;
-    care.log(now, `📋 오늘의 부탁 '${st.quest.label}' 완료 (+${st.quest.reward} 하트)`);
+    care.log(now, L(`📋 오늘의 부탁 '${st.quest.label}' 완료 (+${st.quest.reward} 하트)`, `📋 Request '${st.quest.label}' done (+${st.quest.reward} hearts)`));
     done.push(st.quest);
   }
   const q = care.s.quests;
@@ -82,7 +83,7 @@ export function claimQuests(care: Care, now: number): { done: Quest[]; bonus: nu
   if (bonus) {
     care.s.hearts += bonus;
     care.bump(0.1);
-    care.log(now, `📋 오늘의 부탁을 전부 들어줬어요 (+${bonus} 하트)`);
+    care.log(now, L(`📋 오늘의 부탁을 전부 들어줬어요 (+${bonus} 하트)`, `📋 Did everything she asked today (+${bonus} hearts)`));
   }
   return { done, bonus };
 }

@@ -1,5 +1,9 @@
 // 플라이쨩의 대본. 대사는 미리 쓴 것이고, "오늘 뭐 했어?"만 실제 뇌 출력 기록(오늘의 MN9·그루밍 DN 발화 시간)을 읽는다.
 import type { TodayStats } from "../care/Care.ts";
+import { LANG } from "../i18n.ts";
+import { INTRO_SCENE_EN, MUTTER_EN, STAGE_SCENES_EN, TOPICS_EN, greetingSceneEn } from "./scripts.en.ts";
+
+const EN = LANG === "en";
 
 export type Expr = "happy" | "sad" | "surprised" | "relaxed" | "angry" | "neutral";
 
@@ -33,7 +37,7 @@ export interface TalkContext {
 const L = (text: string, expr?: Expr): Line => ({ text, expr });
 
 // ---------------------------------------------------------------- 관계 단계 이벤트
-export const STAGE_SCENES: Record<number, Scene> = {
+const STAGE_SCENES_KO: Record<number, Scene> = {
   1: {
     id: "stage-1",
     lines: [
@@ -82,7 +86,7 @@ export const STAGE_SCENES: Record<number, Scene> = {
 };
 
 // ---------------------------------------------------------------- 첫 만남
-export const INTRO_SCENE: Scene = {
+const INTRO_SCENE_KO: Scene = {
   id: "intro",
   lines: [
     L("……여긴 어디야?", "surprised"),
@@ -105,7 +109,7 @@ export const INTRO_SCENE: Scene = {
 };
 
 // ---------------------------------------------------------------- 인사
-export function greetingScene(hour: number, awayHours: number, hunger: number): Scene {
+function greetingSceneKo(hour: number, awayHours: number, hunger: number): Scene {
   const tail: Line[] = hunger > 0.75 ? [L("근데… 배고파.", "sad")] : [];
   if (awayHours >= 12) {
     return {
@@ -133,7 +137,7 @@ export function greetingScene(hour: number, awayHours: number, hunger: number): 
 }
 
 // ---------------------------------------------------------------- 대화 주제
-interface Topic {
+export interface Topic {
   id: string;
   minStage: number;
   build: (ctx: TalkContext) => Scene;
@@ -143,7 +147,7 @@ const fixed = (id: string, minStage: number, lines: Line[], choices: Choice[]): 
   id, minStage, build: () => ({ id, lines, choices }),
 });
 
-export const TOPICS: Topic[] = [
+const TOPICS_KO: Topic[] = [
   {
     id: "today",
     minStage: 0,
@@ -305,7 +309,7 @@ export function pickTalk(ctx: TalkContext, recent: string[], rand = Math.random)
 }
 
 /** 가만히 있을 때 가끔 흘리는 혼잣말 (관계 단계별) */
-const MUTTER: string[][] = [
+const MUTTER_KO: string[][] = [
   ["…", "여긴 어디지…", "딸기 냄새 안 나나…"],
   ["심심하다~", "더듬이 간지러워", "오늘 뭐 하지?"],
   ["{me} 언제 와…", "창밖 구경 중", "헤헤, 딸기 생각했다"],
@@ -314,6 +318,18 @@ const MUTTER: string[][] = [
 ];
 
 export function mutter(stage: number, rand = Math.random): string {
-  const lines = MUTTER[Math.min(stage, MUTTER.length - 1)];
+  const table = EN ? MUTTER_EN : MUTTER_KO;
+  const lines = table[Math.min(stage, table.length - 1)];
   return lines[Math.floor(rand() * lines.length)];
 }
+
+// ---------------------------------------------------------------- 언어별로 고르기 (영어 대본은 scripts.en.ts)
+export const STAGE_SCENES = EN ? STAGE_SCENES_EN : STAGE_SCENES_KO;
+export const INTRO_SCENE = EN ? INTRO_SCENE_EN : INTRO_SCENE_KO;
+export const greetingScene = EN ? greetingSceneEn : greetingSceneKo;
+export const TOPICS = EN ? TOPICS_EN : TOPICS_KO;
+/** 테스트: 두 언어의 장면 구성이 같은지 비교한다 */
+export const SCRIPTS_BY_LANG = {
+  ko: { STAGE_SCENES: STAGE_SCENES_KO, INTRO_SCENE: INTRO_SCENE_KO, greetingScene: greetingSceneKo, TOPICS: TOPICS_KO, MUTTER: MUTTER_KO },
+  en: { STAGE_SCENES: STAGE_SCENES_EN, INTRO_SCENE: INTRO_SCENE_EN, greetingScene: greetingSceneEn, TOPICS: TOPICS_EN, MUTTER: MUTTER_EN },
+};

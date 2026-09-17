@@ -1,3 +1,4 @@
+import { L } from "../i18n.ts";
 import type { SensoryGroup } from "../sim/data.ts";
 import { CLOCK_MAX_HZ, clockActivity } from "./Clock.ts";
 
@@ -17,11 +18,11 @@ export const SNACKS: Record<FoodKind, {
   /** 배고플수록 더 민감하게 느끼는 맛인지 */
   byHunger: boolean;
 }> = {
-  sweet: { label: "딸기", emoji: "🍓", group: "sugar", rate: 160, fills: 0.35, byHunger: true },
-  honey: { label: "꿀", emoji: "🍯", group: "pharynx_sugar", rate: 150, fills: 0.3, byHunger: true },
-  water: { label: "물", emoji: "💧", group: "water", rate: 200, fills: 0.1, byHunger: false },
-  salty: { label: "짠 과자", emoji: "🥨", group: "ir94e", rate: 100, fills: 0.05, byHunger: false },
-  bitter: { label: "쓴 버섯", emoji: "🍄", group: "bitter", rate: 160, fills: 0, byHunger: false },
+  sweet: { label: L("딸기", "Strawberry"), emoji: "🍓", group: "sugar", rate: 160, fills: 0.35, byHunger: true },
+  honey: { label: L("꿀", "Honey"), emoji: "🍯", group: "pharynx_sugar", rate: 150, fills: 0.3, byHunger: true },
+  water: { label: L("물", "Water"), emoji: "💧", group: "water", rate: 200, fills: 0.1, byHunger: false },
+  salty: { label: L("짠 과자", "Pretzel"), emoji: "🥨", group: "ir94e", rate: 100, fills: 0.05, byHunger: false },
+  bitter: { label: L("쓴 버섯", "Bitter mushroom"), emoji: "🍄", group: "bitter", rate: 160, fills: 0, byHunger: false },
 };
 /** 굳이 찾아가서 먹는 간식 (쓴 버섯·짠 과자는 스스로 찾지 않는다) */
 export const LIKED_SNACKS: FoodKind[] = ["sweet", "honey", "water"];

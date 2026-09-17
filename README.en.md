@@ -6,7 +6,7 @@
 
 Fly-chan runs the full adult fruit fly brain connectome (FlyWire v783, 138,639 neurons) as a leaky integrate-and-fire (LIF) network in your browser, in real time. Whether she eats the strawberry, jumps away in fright, or grooms her antennae is decided by the descending and motor neurons of that simulated brain, not by a script.
 
-> The game UI is currently Korean only.
+> The game is available in English and Korean. Pick a language on the first screen or at the bottom of the diary.
 
 ![Room](docs/images/room.jpg)
 

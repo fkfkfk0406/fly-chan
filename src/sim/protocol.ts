@@ -1,8 +1,9 @@
 import type { Meta, MotorGroup, SensoryGroup } from "./data.ts";
 import type { Adaptation } from "./lif-engine.ts";
+import type { Lang } from "../i18n.ts";
 
 export type ToWorker =
-  | { type: "init"; dt: number; adaptation: Adaptation }
+  | { type: "init"; dt: number; adaptation: Adaptation; lang: Lang }
   | { type: "stim"; group: SensoryGroup; rate: number }
   | { type: "pause" }
   | { type: "resume" }

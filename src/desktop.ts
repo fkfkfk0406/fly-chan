@@ -2,6 +2,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check } from "@tauri-apps/plugin-updater";
+import { L } from "./i18n.ts";
 
 /** beforeUpdate: 업데이트 설치 직전에 부른다 (저장) */
 export async function setupDesktop(beforeUpdate: () => void): Promise<void> {
@@ -23,18 +24,19 @@ export async function setupDesktop(beforeUpdate: () => void): Promise<void> {
     b.onclick = onClick;
     return b;
   };
-  const pin = button("항상 위", "📌", async () => {
+  const pin = button(L("항상 위", "Always on top"), "📌", async () => {
     const on = !(await win.isAlwaysOnTop());
     await win.setAlwaysOnTop(on);
     pin.classList.toggle("on", on);
   });
+  pin.classList.add("pin");
   pin.classList.toggle("on", await win.isAlwaysOnTop());
 
   bar.append(
     title,
     pin,
-    button("작게", "—", () => void win.minimize()),
-    button("트레이로 숨기기", "✕", () => void win.hide()),
+    button(L("작게", "Minimize"), "—", () => void win.minimize()),
+    button(L("트레이로 숨기기", "Hide to tray"), "✕", () => void win.hide()),
   );
   document.body.prepend(bar);
 
@@ -55,13 +57,13 @@ async function checkUpdate(beforeUpdate: () => void): Promise<void> {
   const box = document.createElement("div");
   box.className = "update-banner";
   const text = document.createElement("span");
-  text.textContent = `새 버전 v${update.version}이 나왔어요`;
+  text.textContent = L(`새 버전 v${update.version}이 나왔어요`, `Version ${update.version} is available`);
   const later = document.createElement("button");
-  later.textContent = "나중에";
+  later.textContent = L("나중에", "Later");
   later.onclick = () => box.remove();
   const now = document.createElement("button");
   now.className = "primary";
-  now.textContent = "업데이트";
+  now.textContent = L("업데이트", "Update");
   now.onclick = async () => {
     now.disabled = later.disabled = true;
     let total = 0;
@@ -71,18 +73,18 @@ async function checkUpdate(beforeUpdate: () => void): Promise<void> {
         if (e.event === "Started") total = e.data.contentLength ?? 0;
         if (e.event === "Progress") {
           got += e.data.chunkLength;
-          text.textContent = total ? `받는 중… ${Math.round((got / total) * 100)}%` : "받는 중…";
+          text.textContent = (total ? L(`받는 중… ${Math.round((got / total) * 100)}%`, `Downloading… ${Math.round((got / total) * 100)}%`) : L("받는 중…", "Downloading…"));
         }
         if (e.event === "Finished") {
-          text.textContent = "설치하는 중…";
+          text.textContent = L("설치하는 중…", "Installing…");
           beforeUpdate();
         }
       });
       await relaunch();
     } catch (err) {
-      text.textContent = `업데이트 실패: ${err instanceof Error ? err.message : String(err)}`;
+      text.textContent = L("업데이트 실패: ", "Update failed: ") + (err instanceof Error ? err.message : String(err));
       later.disabled = false;
-      later.textContent = "닫기";
+      later.textContent = L("닫기", "Close");
     }
   };
   box.append(text, later, now);

@@ -1,3 +1,4 @@
+import { L } from "../i18n.ts";
 import type { Connectome, LifParams } from "./lif-engine.ts";
 
 export type GroupName =
@@ -36,7 +37,7 @@ export function parseConnectome(meta: Meta, [offsets, targets, weights]: ArrayBu
     weights: new Int16Array(weights),
   };
   if (conn.offsets.length !== conn.n + 1 || conn.targets.length !== meta.connections) {
-    throw new Error("커넥톰 파일 크기가 meta.json 과 맞지 않습니다. npm run data 를 다시 실행하세요.");
+    throw new Error(L("커넥톰 파일 크기가 meta.json 과 맞지 않습니다. npm run data 를 다시 실행하세요.", "Connectome file sizes do not match meta.json. Run npm run data again."));
   }
   return conn;
 }

@@ -3,6 +3,8 @@
 //  - 딸기 받기: 떨어지는 딸기를 바구니로 받는다
 
 /** 보정 (scripts/loom-probe.ts): 루밍 6 Hz 까지는 대체로 버티고, 8 Hz 부터 Giant Fiber 가 30 Hz 를 넘는다 */
+import { L } from "../i18n.ts";
+
 export const LOOM_GAIN = 20;
 const REACH = { vMax: 0.45, accel: 1.2, brake: 3, limit: 25 };
 const CATCH = { seconds: 20, spawnEvery: 0.55 };
@@ -55,7 +57,7 @@ export class MiniGames {
     const bar = el("div", "game-meter");
     this.meter = el("div", "fill");
     bar.append(this.meter);
-    const quit = el("button", "game-quit", "그만하기");
+    const quit = el("button", "game-quit", L("그만하기", "Quit"));
     quit.addEventListener("pointerdown", (e) => e.stopPropagation());
     quit.onclick = () => this.close();
     head.append(el("b", "", title), this.info, bar, quit);
@@ -76,7 +78,7 @@ export class MiniGames {
 
   startReach(): void {
     if (this.active) return;
-    const layer = this.open("🤚 살금살금 손 뻗기", "꾹 누르고 있으면(스페이스도 돼요) 손이 다가가요. 너무 빨리 다가가면 도망가요!");
+    const layer = this.open(L("🤚 살금살금 손 뻗기", "🤚 Sneaky hand"), L("꾹 누르고 있으면(스페이스도 돼요) 손이 다가가요. 너무 빨리 다가가면 도망가요!", "Hold down (or Space) to move your hand closer. Too fast and she escapes!"));
     const hand = el("div", "game-hand", "🤚");
     layer.append(hand);
     let d = 1;
@@ -110,7 +112,7 @@ export class MiniGames {
       const gf = this.hooks.giantFiber();
       this.meter.style.width = `${Math.min(100, (gf / 30) * 100)}%`;
       this.meter.classList.toggle("danger", gf > 20);
-      this.info.textContent = `거리 ${Math.round(d * 100)}% · LPLC2 루밍 ${hz.toFixed(1)} Hz · Giant Fiber ${gf.toFixed(0)}/30 Hz`;
+      this.info.textContent = L(`거리 ${Math.round(d * 100)}% · LPLC2 루밍 ${hz.toFixed(1)} Hz · Giant Fiber ${gf.toFixed(0)}/30 Hz`, `Distance ${Math.round(d * 100)}% · LPLC2 looming ${hz.toFixed(1)} Hz · Giant Fiber ${gf.toFixed(0)}/30 Hz`);
       const a = this.hooks.anchor();
       const sx = innerWidth * 0.92;
       const sy = innerHeight * 1.05;
@@ -127,7 +129,7 @@ export class MiniGames {
 
   startCatch(): void {
     if (this.active) return;
-    const layer = this.open("🧺 딸기 받기", "바구니를 움직여 딸기를 받아요. 🍄은 피하기!");
+    const layer = this.open(L("🧺 딸기 받기", "🧺 Strawberry catch"), L("바구니를 움직여 딸기를 받아요. 🍄은 피하기!", "Move the basket to catch strawberries. Dodge the 🍄!"));
     const basket = el("div", "game-basket", "🧺");
     layer.append(basket);
     let x = innerWidth / 2;
@@ -175,7 +177,7 @@ export class MiniGames {
       }
       const left = Math.max(0, CATCH.seconds - t);
       this.meter.style.width = `${(left / CATCH.seconds) * 100}%`;
-      this.info.textContent = `🍓 ${berries}개 · 남은 시간 ${Math.ceil(left)}초`;
+      this.info.textContent = L(`🍓 ${berries}개 · 남은 시간 ${Math.ceil(left)}초`, `🍓 ${berries} · ${Math.ceil(left)} s left`);
       if (left <= 0) {
         this.close();
         this.hooks.onEnd({ game: "catch", berries });

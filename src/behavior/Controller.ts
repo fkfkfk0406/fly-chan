@@ -4,6 +4,7 @@
 // 코드로, 섭식(MN9)·그루밍·도약(Giant Fiber)·전진/후진/회전 DN 은 뇌 시뮬 출력으로 결정한다.
 import type { Care, CareEvent } from "../care/Care.ts";
 import type { MotorGroup } from "../sim/data.ts";
+import { L } from "../i18n.ts";
 import {
   BED, BED_SIDE, CAMERA_HOME, LIKED_SNACKS, MOUTH_REACH, ROOM_HALF, SNACKS, clamp, insideBed,
   type FoodKind, type Habitat, type Pose,
@@ -12,12 +13,12 @@ import {
 export type Behavior = "idle" | "walk" | "groom" | "feed" | "escape" | "sleep";
 
 export const BEHAVIOR_LABEL: Record<Behavior, string> = {
-  idle: "두리번",
-  walk: "걷는 중",
-  groom: "더듬이 손질",
-  feed: "냠냠 먹는 중",
-  escape: "깜짝 도약",
-  sleep: "쿨쿨 자는 중",
+  idle: L("두리번", "Looking around"),
+  walk: L("걷는 중", "Walking"),
+  groom: L("더듬이 손질", "Grooming"),
+  feed: L("냠냠 먹는 중", "Eating"),
+  escape: L("깜짝 도약", "Startle jump"),
+  sleep: L("쿨쿨 자는 중", "Sleeping"),
 };
 
 export interface BodyState extends Pose {
@@ -161,7 +162,7 @@ export class Controller {
         s.jump = Math.min(1, s.jump + dt / HOLD.escape);
         targetSpeed = s.jump < 0.8 ? 2 : 0;
         targetTurn = this.escapeDir * 2.5 * (1 - s.jump);
-        s.cause = `Giant Fiber(DNp01) ${r.escape.toFixed(0)} Hz ← LPLC2 루밍`;
+        s.cause = `Giant Fiber(DNp01) ${r.escape.toFixed(0)} Hz ← ${L("LPLC2 루밍", "LPLC2 looming")}`;
         break;
       }
       case "feed": {
@@ -171,18 +172,18 @@ export class Controller {
           care.eat(habitat.eat(mouth.food, dt), mouth.food.kind);
         }
         const snack = this.eatingKind ? SNACKS[this.eatingKind] : null;
-        s.cause = `MN9 ${r.feed.toFixed(0)} Hz ← ${snack ? snack.label : "당"} 맛 뉴런`;
+        s.cause = L(`MN9 ${r.feed.toFixed(0)} Hz ← ${snack ? snack.label : "당"} 맛 뉴런`, `MN9 ${r.feed.toFixed(0)} Hz ← ${snack ? snack.label.toLowerCase() : "sugar"} taste neurons`);
         break;
       }
       case "groom":
-        s.cause = `그루밍 DN ${r.groom.toFixed(0)} Hz ← JO-F 접촉`;
+        s.cause = L(`그루밍 DN ${r.groom.toFixed(0)} Hz ← JO-F 접촉`, `Grooming DNs ${r.groom.toFixed(0)} Hz ← JO-F touch`);
         break;
       case "sleep": {
         s.x += (BED.x - s.x) * (1 - Math.exp(-dt * 4));
         s.z += (BED.z - s.z) * (1 - Math.exp(-dt * 4));
         s.heading = SLEEP_HEADING;
         targetElev = BED.height;
-        s.cause = "졸림 (게임 상태)";
+        s.cause = L("졸림 (게임 상태)", "Sleepiness (game state)");
         if (c.sleepiness <= 0 || (habitat.lightsOn && c.sleepiness < 0.6 && s.behaviorTime > 3)) {
           this.onEvent("wake");
           this.leaveBed();
@@ -198,19 +199,19 @@ export class Controller {
         if (now < this.avoidUntil) {
           targetSpeed = -0.5;
           targetTurn = 1.8;
-          s.cause = "쓴맛 GRN → 회피 반사";
+          s.cause = L("쓴맛 GRN → 회피 반사", "Bitter GRNs → avoidance reflex");
           break;
         }
 
         if (this.talking) {
           targetTurn = wrapAngle(Math.atan2(CAMERA_HOME.x - s.x, CAMERA_HOME.z - s.z) - s.heading) * 3;
-          s.cause = "대화 중";
+          s.cause = L("대화 중", "Talking");
           break;
         }
 
         if (goingToBed) {
           const dist = steerTo(BED_SIDE.x, BED_SIDE.z, 0.2, 0.45);
-          s.cause = "졸려서 침대로";
+          s.cause = L("졸려서 침대로", "Sleepy, heading to bed");
           if (dist < 0.3) {
             this.onEvent("sleep");
             s.behavior = "sleep";
@@ -224,7 +225,7 @@ export class Controller {
         if (unknown) {
           const label = SNACKS[unknown.kind].label;
           const dist = steerTo(unknown.x, unknown.z, MOUTH_REACH * 0.8, 0.6);
-          s.cause = dist > MOUTH_REACH ? `처음 보는 ${label}…` : `${label} 맛보는 중`;
+          s.cause = dist > MOUTH_REACH ? L(`처음 보는 ${label}…`, `Something new: ${label.toLowerCase()}…`) : L(`${label} 맛보는 중`, `Tasting the ${label.toLowerCase()}`);
           if (dist < MOUTH_REACH) {
             if (this.atFoodSince < 0) this.atFoodSince = now;
             if (now - this.atFoodSince > 2.5) this.refusedFood = unknown.id; // 맛만 보고 반응은 뇌가 정한다
@@ -235,7 +236,7 @@ export class Controller {
         if (meal && meal.food.id !== this.refusedFood && c.hunger > 0.15) {
           const label = SNACKS[meal.food.kind].label;
           const dist = steerTo(meal.food.x, meal.food.z, MOUTH_REACH * 0.8, 0.7);
-          s.cause = dist > MOUTH_REACH ? `배고파서 ${label} 쪽으로` : `${label} 맛보는 중`;
+          s.cause = dist > MOUTH_REACH ? L(`배고파서 ${label} 쪽으로`, `Hungry, going for the ${label.toLowerCase()}`) : L(`${label} 맛보는 중`, `Tasting the ${label.toLowerCase()}`);
           if (dist < MOUTH_REACH) {
             if (this.atFoodSince < 0) this.atFoodSince = now;
             // 맛을 봤는데 MN9 가 반응하지 않으면(배부름) 거절
@@ -252,7 +253,7 @@ export class Controller {
         if (this.sulking) {
           targetTurn = wrapAngle(Math.atan2(s.x - CAMERA_HOME.x, s.z - CAMERA_HOME.z) - s.heading) * 3;
           targetSpeed = 0;
-          s.cause = "삐져서 등 돌림";
+          s.cause = L("삐져서 등 돌림", "Sulking, back turned");
           break;
         }
 
@@ -260,8 +261,8 @@ export class Controller {
           const dist = steerTo(USER_SPOT.x, USER_SPOT.z, 0.2, 0.55);
           if (dist < 0.3) {
             targetTurn = wrapAngle(Math.atan2(CAMERA_HOME.x - s.x, CAMERA_HOME.z - s.z) - s.heading) * 3;
-            s.cause = "애정 → 나를 보러 옴";
-          } else s.cause = "애정 → 다가오는 중";
+            s.cause = L("애정 → 나를 보러 옴", "Love → came to see you");
+          } else s.cause = L("애정 → 다가오는 중", "Love → coming closer");
           break;
         }
 
@@ -274,7 +275,7 @@ export class Controller {
         this.wanderTurn += (-this.wanderTurn * 0.5 + (Math.random() - 0.5) * 3) * dt;
         targetTurn = this.wanderTurn;
         targetSpeed = now < this.pauseUntil ? 0 : 0.4;
-        s.cause = targetSpeed ? "산책 (VNC 드라이브)" : "두리번";
+        s.cause = targetSpeed ? L("산책 (VNC 드라이브)", "Strolling (VNC drive)") : L("두리번", "Looking around");
         break;
       }
     }
@@ -292,7 +293,7 @@ export class Controller {
       const fidget = clamp((turnSum - 10) / 30, 0, 1);
       if (fidget > 0 && Math.abs(targetSpeed) < 0.25) {
         targetTurn += Math.sin(now * 5) * 2.4 * fidget;
-        if (fidget > 0.3) s.cause = `pC1 설렘 → 회전 DN ${turnSum.toFixed(0)} Hz (안절부절)`;
+        if (fidget > 0.3) s.cause = L(`pC1 설렘 → 회전 DN ${turnSum.toFixed(0)} Hz (안절부절)`, `pC1 excitement → turning DNs ${turnSum.toFixed(0)} Hz (fidgeting)`);
       }
     }
 

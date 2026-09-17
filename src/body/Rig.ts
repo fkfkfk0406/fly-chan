@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, VRMUtils, type VRM } from "@pixiv/three-vrm";
+import { L } from "../i18n.ts";
 
 export const BONES = [
   "hips", "spine", "chest", "upperChest", "neck", "head",
@@ -42,7 +43,7 @@ export async function loadVrmRig(url: string, onProgress?: (ratio: number) => vo
   loader.register((parser) => new VRMLoaderPlugin(parser));
   const gltf = await loader.loadAsync(url, (e) => e.total && onProgress?.(e.loaded / e.total));
   const vrm = gltf.userData.vrm as VRM | undefined;
-  if (!vrm) throw new Error("VRM 데이터가 없는 파일입니다");
+  if (!vrm) throw new Error(L("VRM 데이터가 없는 파일입니다", "This file has no VRM data"));
 
   VRMUtils.removeUnnecessaryVertices(gltf.scene);
   VRMUtils.combineSkeletons(gltf.scene);

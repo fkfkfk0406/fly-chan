@@ -15,49 +15,49 @@
         <strong data-name-upper>플라이쨩</strong>
         <span><b id="stage">💞 낯섦</b> · <span id="days">함께한 지 1일</span></span>
       </div>
-      <ul class="gauges" aria-label="상태">
-        <li><span class="icon" aria-hidden="true">🍓</span><span class="label">배부름</span><span class="bar"><i id="g-full"></i></span></li>
-        <li><span class="icon" aria-hidden="true">⚡</span><span class="label">기운</span><span class="bar"><i id="g-energy"></i></span></li>
-        <li><span class="icon" aria-hidden="true">🙂</span><span class="label">기분</span><span class="bar"><i id="g-mood"></i></span></li>
-        <li><span class="icon" aria-hidden="true">🧼</span><span class="label">청결</span><span class="bar"><i id="g-clean"></i></span></li>
-        <li><span class="icon" aria-hidden="true">💗</span><span class="label">애정</span><span class="bar"><i id="g-love"></i></span></li>
+      <ul class="gauges" aria-label="상태" data-en-aria="Status">
+        <li><span class="icon" aria-hidden="true">🍓</span><span class="label" data-en="Full">배부름</span><span class="bar"><i id="g-full"></i></span></li>
+        <li><span class="icon" aria-hidden="true">⚡</span><span class="label" data-en="Energy">기운</span><span class="bar"><i id="g-energy"></i></span></li>
+        <li><span class="icon" aria-hidden="true">🙂</span><span class="label" data-en="Mood">기분</span><span class="bar"><i id="g-mood"></i></span></li>
+        <li><span class="icon" aria-hidden="true">🧼</span><span class="label" data-en="Clean">청결</span><span class="bar"><i id="g-clean"></i></span></li>
+        <li><span class="icon" aria-hidden="true">💗</span><span class="label" data-en="Love">애정</span><span class="bar"><i id="g-love"></i></span></li>
       </ul>
       <div class="hud-buttons">
-        <span class="hearts" title="하트: 함께 있을 때도, 자리를 비운 동안에도 모여요"><span aria-hidden="true">💖</span><b id="heart-count">0</b></span>
-        <button id="btn-shop" class="shop-btn" aria-label="상점 열기"><span aria-hidden="true">🛍️</span>상점</button>
-        <button id="btn-photo" class="round" aria-label="사진 찍기">📷</button>
-        <button id="btn-mute" class="round" aria-label="소리 끄기">🔊</button>
-        <button id="btn-diary" class="round" aria-label="일기">📔</button>
-        <button id="btn-album" class="round" aria-label="추억과 오늘의 부탁">🎞️</button>
+        <span class="hearts" title="하트: 함께 있을 때도, 자리를 비운 동안에도 모여요" data-en-title="Hearts: they pile up while you are together and while you are away"><span aria-hidden="true">💖</span><b id="heart-count">0</b></span>
+        <button id="btn-shop" class="shop-btn" aria-label="상점 열기" data-en-aria="Open shop"><span aria-hidden="true">🛍️</span><span data-en="Shop">상점</span></button>
+        <button id="btn-photo" class="round" aria-label="사진 찍기" data-en-aria="Take a photo">📷</button>
+        <button id="btn-mute" class="round" aria-label="소리 끄기" data-en-aria="Mute">🔊</button>
+        <button id="btn-diary" class="round" aria-label="일기" data-en-aria="Diary">📔</button>
+        <button id="btn-album" class="round" aria-label="추억과 오늘의 부탁" data-en-aria="Memories and today">🎞️</button>
       </div>
     </header>
 
     <p class="status" id="status" aria-live="polite">&nbsp;</p>
 
-    <nav class="dock" aria-label="돌봄">
+    <nav class="dock" aria-label="돌봄" data-en-aria="Care">
       <div class="prank">
-        <button id="btn-feed" aria-expanded="false"><span aria-hidden="true">🍓</span>간식</button>
+        <button id="btn-feed" aria-expanded="false"><span aria-hidden="true">🍓</span><span data-en="Snack">간식</span></button>
         <div class="menu" id="snack-menu" hidden>
-          <button data-snack="sweet">🍓 딸기</button>
-          <button data-snack="honey">🍯 꿀</button>
-          <button data-snack="water">💧 물</button>
-          <button data-snack="salty">🥨 짠 과자</button>
+          <button data-snack="sweet" data-en="🍓 Strawberry">🍓 딸기</button>
+          <button data-snack="honey" data-en="🍯 Honey">🍯 꿀</button>
+          <button data-snack="water" data-en="💧 Water">💧 물</button>
+          <button data-snack="salty" data-en="🥨 Pretzel">🥨 짠 과자</button>
         </div>
       </div>
-      <button id="btn-talk"><span aria-hidden="true">💬</span>대화</button>
-      <button id="btn-pet"><span aria-hidden="true">✋</span>쓰담</button>
-      <button id="btn-clean"><span aria-hidden="true">🧹</span>청소</button>
+      <button id="btn-talk"><span aria-hidden="true">💬</span><span data-en="Talk">대화</span></button>
+      <button id="btn-pet"><span aria-hidden="true">✋</span><span data-en="Pet">쓰담</span></button>
+      <button id="btn-clean"><span aria-hidden="true">🧹</span><span data-en="Clean">청소</span></button>
       <div class="prank">
-        <button id="btn-prank" aria-expanded="false"><span aria-hidden="true">🎲</span>놀이</button>
+        <button id="btn-prank" aria-expanded="false"><span aria-hidden="true">🎲</span><span data-en="Play">놀이</span></button>
         <div class="menu" id="prank-menu" hidden>
-          <button id="btn-reach">🤚 살금살금 손 뻗기</button>
-          <button id="btn-catch">🧺 딸기 받기</button>
-          <button id="btn-bitter">🍄 쓴 버섯 주기</button>
-          <button id="btn-scare">👻 깜짝 놀래키기</button>
+          <button id="btn-reach" data-en="🤚 Sneaky hand">🤚 살금살금 손 뻗기</button>
+          <button id="btn-catch" data-en="🧺 Strawberry catch">🧺 딸기 받기</button>
+          <button id="btn-bitter" data-en="🍄 Give a bitter mushroom">🍄 쓴 버섯 주기</button>
+          <button id="btn-scare" data-en="👻 Scare her">👻 깜짝 놀래키기</button>
         </div>
       </div>
       <button id="btn-light"><span aria-hidden="true">💡</span><em>불 끄기</em></button>
-      <button id="btn-brain" aria-expanded="false"><span aria-hidden="true">🧠</span>뇌</button>
+      <button id="btn-brain" aria-expanded="false"><span aria-hidden="true">🧠</span><span data-en="Brain">뇌</span></button>
     </nav>
 
     <section class="dialog" id="dialog" hidden aria-live="polite">
@@ -71,32 +71,32 @@
       <div class="drawer-head">
         <div>
           <span class="kicker">NEURAL FIELD</span>
-          <h2 id="neuron-title">뇌</h2>
+          <h2 id="neuron-title" data-en="Brain">뇌</h2>
         </div>
-        <button class="close" data-close="brain-panel" aria-label="닫기">✕</button>
+        <button class="close" data-close="brain-panel" aria-label="닫기" data-en-aria="Close">✕</button>
       </div>
       <div class="viewport" id="neural-view"></div>
       <div class="drawer-body">
         <p class="now"><strong id="now-behavior">–</strong><span id="now-cause">&nbsp;</span></p>
         <dl class="stats">
-          <div><dt>평균 발화율</dt><dd id="stat-mean">–</dd></div>
-          <div><dt>발화 뉴런</dt><dd id="stat-spiking">–</dd></div>
-          <div><dt>탈분극 뉴런</dt><dd id="stat-active">–</dd></div>
-          <div><dt>시뮬 속도</dt><dd id="stat-speed">–</dd></div>
+          <div><dt data-en="Mean rate">평균 발화율</dt><dd id="stat-mean">–</dd></div>
+          <div><dt data-en="Spiking">발화 뉴런</dt><dd id="stat-spiking">–</dd></div>
+          <div><dt data-en="Depolarized">탈분극 뉴런</dt><dd id="stat-active">–</dd></div>
+          <div><dt data-en="Sim speed">시뮬 속도</dt><dd id="stat-speed">–</dd></div>
         </dl>
-        <h3>하강·운동 뉴런 <small>0–150 Hz</small></h3>
+        <h3><span data-en="Descending / motor neurons">하강·운동 뉴런</span> <small>0–150 Hz</small></h3>
         <div class="meters" id="meters"></div>
-        <h3>핵심 뉴런 스파이크 <small>최근 6초 · 막전위</small></h3>
+        <h3><span data-en="Key neuron spikes">핵심 뉴런 스파이크</span> <small data-en="last 6 s · membrane potential">최근 6초 · 막전위</small></h3>
         <canvas class="raster" id="raster"></canvas>
-        <h3>지금 들어오는 감각</h3>
+        <h3 data-en="Sensory input right now">지금 들어오는 감각</h3>
         <div class="stim" id="stim"></div>
         <p class="top-dn" id="top-dn">&nbsp;</p>
         <div class="row">
-          <button class="chip-btn" id="rotate-toggle" aria-pressed="true">자동 회전</button>
+          <button class="chip-btn" id="rotate-toggle" aria-pressed="true" data-en="Auto-rotate">자동 회전</button>
           <button class="chip-btn" id="sim-toggle" aria-pressed="true">시뮬 실행 중</button>
         </div>
         <p class="fine" id="source">FlyWire v783 · LIF</p>
-        <p class="fine">배부름만 뇌 입력(당 GRN 세기)에 반영되고, 기운·기분·청결·애정은 뇌 밖의 게임 상태입니다.</p>
+        <p class="fine" data-en="Only fullness feeds into the brain (sugar GRN strength); energy, mood, cleanliness and love are game state outside the brain.">배부름만 뇌 입력(당 GRN 세기)에 반영되고, 기운·기분·청결·애정은 뇌 밖의 게임 상태입니다.</p>
       </div>
     </aside>
 
@@ -104,20 +104,20 @@
       <div class="drawer-head">
         <div>
           <span class="kicker">SHOP</span>
-          <h2>상점 <small id="shop-hearts">💖 0</small></h2>
+          <h2><span data-en="Shop">상점</span> <small id="shop-hearts">💖 0</small></h2>
         </div>
-        <button class="close" data-close="shop-panel" aria-label="닫기">✕</button>
+        <button class="close" data-close="shop-panel" aria-label="닫기" data-en-aria="Close">✕</button>
       </div>
       <div class="drawer-body">
-        <p class="note" id="shop-note">하트는 함께 있는 동안, 그리고 자리를 비운 동안에도 모여요. 애정이 깊고 방이 깨끗할수록 빨리 모입니다.</p>
-        <h3>간식</h3>
+        <p class="note" id="shop-note" data-en="Hearts pile up while you are together and while you are away. The deeper her love and the cleaner the room, the faster they come.">하트는 함께 있는 동안, 그리고 자리를 비운 동안에도 모여요. 애정이 깊고 방이 깨끗할수록 빨리 모입니다.</p>
+        <h3 data-en="Snacks">간식</h3>
         <div class="shop-list" id="shop-snacks"></div>
-        <h3>꾸미기</h3>
+        <h3 data-en="Decorations">꾸미기</h3>
         <div class="shop-list" id="shop-cosmetics"></div>
-        <h3>외형</h3>
+        <h3 data-en="Looks">외형</h3>
         <div class="shop-list" id="shop-avatar"></div>
         <input type="file" id="vrm-file" accept=".vrm,.glb" hidden />
-        <h3>선물</h3>
+        <h3 data-en="Gift">선물</h3>
         <div class="shop-list" id="shop-gift"></div>
       </div>
     </aside>
@@ -126,18 +126,18 @@
       <div class="drawer-head">
         <div>
           <span class="kicker">MEMORIES</span>
-          <h2>추억과 오늘</h2>
+          <h2 data-en="Memories &amp; today">추억과 오늘</h2>
         </div>
-        <button class="close" data-close="album-panel" aria-label="닫기">✕</button>
+        <button class="close" data-close="album-panel" aria-label="닫기" data-en-aria="Close">✕</button>
       </div>
       <div class="drawer-body">
-        <h3>출석 <small id="album-streak"></small></h3>
+        <h3><span data-en="Check-in">출석</span> <small id="album-streak"></small></h3>
         <div class="attend" id="album-attend"></div>
-        <h3>오늘의 부탁</h3>
+        <h3 data-en="Today's requests">오늘의 부탁</h3>
         <ul class="quests" id="album-quests"></ul>
-        <h3>추억 다시 보기</h3>
+        <h3 data-en="Replay memories">추억 다시 보기</h3>
         <div class="shop-list" id="album-memories"></div>
-        <h3>사진</h3>
+        <h3 data-en="Photos">사진</h3>
         <div class="photos" id="album-photos"></div>
       </div>
     </aside>
@@ -146,33 +146,35 @@
       <div class="drawer-head">
         <div>
           <span class="kicker">DIARY</span>
-          <h2><span data-name>플라이쨩</span>의 일기</h2>
+          <h2 id="diary-title"><span data-name>플라이쨩</span>의 일기</h2>
         </div>
-        <button class="close" data-close="diary-panel" aria-label="닫기">✕</button>
+        <button class="close" data-close="diary-panel" aria-label="닫기" data-en-aria="Close">✕</button>
       </div>
       <div class="drawer-body">
         <dl class="stats" id="diary-stats"></dl>
         <ol class="entries" id="diary-list"></ol>
-        <button class="danger" id="btn-restart">처음부터 다시 키우기</button>
+        <div class="lang-switch" aria-label="언어" data-en-aria="Language"><button data-lang="ko">한국어</button><button data-lang="en">English</button></div>
+        <button class="danger" id="btn-restart" data-en="Start over from the beginning">처음부터 다시 키우기</button>
       </div>
     </aside>
 
     <div class="overlay" id="overlay">
       <div class="loading">
         <div class="wordmark">FLY-CHAN</div>
+        <div class="lang-switch" aria-label="언어" data-en-aria="Language"><button data-lang="ko">한국어</button><button data-lang="en">English</button></div>
         <form class="naming" id="naming" hidden>
-          <p class="lead">초파리의 뇌를 가진 아이가 곧 깨어나요.</p>
-          <label>이 아이의 이름
-            <input id="input-name" maxlength="8" placeholder="플라이쨩" autocomplete="off" />
+          <p class="lead" data-en="A girl with a fruit fly's brain is about to wake up.">초파리의 뇌를 가진 아이가 곧 깨어나요.</p>
+          <label><span data-en="Her name">이 아이의 이름</span>
+            <input id="input-name" maxlength="8" placeholder="플라이쨩" data-en-placeholder="Fly-chan" autocomplete="off" />
           </label>
-          <label>나를 부를 호칭
-            <input id="input-me" maxlength="8" placeholder="너" autocomplete="off" />
+          <label><span data-en="What she calls you">나를 부를 호칭</span>
+            <input id="input-me" maxlength="8" placeholder="너" data-en-placeholder="you" autocomplete="off" />
           </label>
-          <button type="submit" id="btn-name">이름 지어 주기</button>
+          <button type="submit" id="btn-name" data-en="Give her a name">이름 지어 주기</button>
         </form>
-        <p id="load-label">뇌를 깨우는 중…</p>
+        <p id="load-label" data-en="Waking up the brain…">뇌를 깨우는 중…</p>
         <div class="progress"><i id="load-bar"></i></div>
-        <p class="fine">FlyWire v783 (Dorkenwald·Schlegel et al. 2024) · LIF 모델 Shiu et al. 2024</p>
+        <p class="fine">FlyWire v783 (Dorkenwald·Schlegel et al. 2024) · <span data-en="LIF model">LIF 모델</span> Shiu et al. 2024</p>
       </div>
     </div>
 

@@ -1,3 +1,4 @@
+import { L } from "../i18n.ts";
 /** 핵심 뉴런 스파이크 래스터(최근 6초)와 막전위 표시 */
 const WINDOW_MS = 6000;
 const ROW = 16;
@@ -67,9 +68,9 @@ export class Raster {
       ctx.fillRect(LABEL_W + plotW + 4, y + 5, (VOLT_W - 8) * frac, 2);
     });
     ctx.fillStyle = "#5a5775";
-    ctx.fillText("-6초", LABEL_W, h - 6);
+    ctx.fillText(L("-6초", "-6 s"), LABEL_W, h - 6);
     ctx.textAlign = "right";
-    ctx.fillText("지금", LABEL_W + plotW, h - 6);
+    ctx.fillText(L("지금", "now"), LABEL_W + plotW, h - 6);
     ctx.textAlign = "left";
   }
 }
