@@ -1,5 +1,6 @@
 // 다마고치식 돌봄 상태. 뇌 시뮬레이션 밖의 "게임 상태"다.
 // 배고픔만 뇌에 닿는다(배고플수록 당 GRN 입력이 세짐, Habitat.sense). 나머지는 행동 선택·표정·말풍선에 쓴다.
+import { type Letter, writeLetter } from "../story/away.ts";
 import { hasBatchim } from "../story/personalize.ts";
 import { hourOf, sleepinessFactor } from "../world/Clock.ts";
 import { ROOM_HALF, SNACKS, insideBed, type FoodKind } from "../world/Habitat.ts";
@@ -97,6 +98,8 @@ export interface TodayStats {
   pets: number;
   meals: number;
   talks: number;
+  /** 미니게임 보상을 받은 횟수 */
+  games?: number;
 }
 
 export interface DiaryEntry {
@@ -139,6 +142,18 @@ export interface CareState {
   eggs: string[];
   sweetStreak: number;
   title: string;
+  /** 연속 출석 */
+  attend: { last: string; streak: number };
+  /** 오늘의 부탁: 날짜, 고른 부탁, 그날 처음 기록, 보상 받은 부탁 */
+  quests: { day: string; ids: string[]; base: Partial<Totals>; claimed: string[] };
+  /** 추억 앨범: 다시 볼 수 있는 장면 id, 사진(찍은 시각, IndexedDB 에 보관) */
+  memories: string[];
+  album: number[];
+  /** 삐짐 0-1 과 이유. 쓰다듬기·좋아하는 간식·대화·선물로 풀린다 */
+  sulk: number;
+  sulkWhy: "away" | "jealous";
+  /** 자리를 비운 동안 남긴 편지 (읽으면 비운다) */
+  letter: Letter | null;
   /** 마지막으로 찍은 사진 (액자에 걸린다) */
   photo: string;
   /** 하트: 상점 재화 */
@@ -181,6 +196,7 @@ const RATE = {
 };
 const LONELY_PER_DAY = 0.02; // 하루 넘게 안 오면 하루마다 애정 감소
 const MESS_MAX = 6;
+const SULK_DECAY = 0.08; // 게임 시간당. 달래지 않아도 반나절이면 풀린다
 const MESS_WEIGHT = 0.18; // 얼룩 하나당 청결도 감소
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
@@ -219,6 +235,8 @@ export class Care {
       stageSeen: 0, gameHours: 0, gainDay: 0, gainToday: 0,
       totals: { meals: 0, pets: 0, cleans: 0, talks: 0, sleeps: 0, scares: 0, grooms: 0, photos: 0 },
       unlocked: [], photo: "", avatar: "girl", eggs: [], sweetStreak: 0, title: "",
+      attend: { last: "", streak: 0 }, quests: { day: "", ids: [], base: {}, claimed: [] },
+      memories: [], album: [], sulk: 0, sulkWhy: "away", letter: null,
       hearts: 20, pendingHearts: 0, stock: { sweet: 3, honey: 0, water: 2, salty: 0, bitter: 1 },
       owned: [], giftDay: -1, heartsToday: 0,
       greetedDay: "", today: emptyToday(now), recentTalks: [], tastes: {},
@@ -247,6 +265,7 @@ export class Care {
     this.awayHours = hours;
     if (hours < 1 / 60) return;
     const wasAsleep = this.s.asleep;
+    let slept = wasAsleep;
     this.offline = true;
     // 1분 단위로 흘린다 (최대 72시간 = 4320 스텝)
     const steps = Math.ceil(hours * 60);
@@ -254,11 +273,19 @@ export class Care {
     for (let k = 0; k < steps; k++) {
       this.passTime((hours * HOUR) / steps / this.timeScale, hourOf(this.s.lastSeen + k * stepMs));
       if (this.s.asleep && this.s.sleepiness <= 0) this.s.asleep = false;
+      if (this.s.asleep) slept = true;
     }
     this.offline = false;
     const lonely = Math.max(0, hours - 24) / 24;
     this.s.affection = clamp01(this.s.affection - LONELY_PER_DAY * lonely);
     this.s.lastSeen = now;
+    if (hours >= 24 && this.s.stageSeen >= 1) this.sulkUp(Math.min(1, 0.4 + (hours - 24) / 48), now, "away");
+    if (hours >= 6 && this.named) {
+      this.s.letter = writeLetter(
+        { stage: this.s.stageSeen, hours, hungry: this.s.hunger > 0.75, dirty: this.cleanliness < 0.6, slept },
+        now,
+      );
+    }
     const away = hours >= 1 ? `${Math.floor(hours)}시간` : `${Math.round(hours * 60)}분`;
     const notes = [
       this.s.hunger > 0.85 && "배가 많이 고파 보여요.",
@@ -274,6 +301,7 @@ export class Care {
     const h = (realSec * this.timeScale) / HOUR;
     const s = this.s;
     s.gameHours += h;
+    s.sulk = Math.max(0, s.sulk - SULK_DECAY * h);
     if (s.asleep) {
       s.hunger = clamp01(s.hunger + RATE.hungerAsleep * h);
       s.sleepiness = clamp01(s.sleepiness - RATE.sleepRecover * h);
@@ -302,9 +330,27 @@ export class Care {
     // 기분은 애정·배고픔·졸림·청결이 정하는 기준값으로 천천히(τ 2분) 돌아간다
     const target = clamp01(
       0.5 + 0.35 * (s.affection - 0.5) - 0.45 * Math.max(0, s.hunger - 0.6) -
-        0.35 * Math.max(0, s.sleepiness - 0.75) - 0.3 * Math.max(0, 0.7 - this.cleanliness),
+        0.35 * Math.max(0, s.sleepiness - 0.75) - 0.3 * Math.max(0, 0.7 - this.cleanliness) - 0.25 * s.sulk,
     );
     s.mood += (target - s.mood) * (1 - Math.exp(-realSec / 120));
+  }
+
+  /** 삐지게 한다 (이미 더 삐져 있으면 그대로) */
+  sulkUp(level: number, now: number, why: "away" | "jealous"): void {
+    if (level <= this.s.sulk) return;
+    if (this.s.sulk === 0) this.log(now, why === "jealous" ? "💢 다른 창을 오래 보고 왔더니 질투했어요." : "💢 오래 혼자 둬서 삐졌어요.");
+    this.s.sulk = clamp01(level);
+    this.s.sulkWhy = why;
+  }
+
+  /** 삐짐을 풀어 준다. 이번에 다 풀렸으면 true */
+  soothe(amount: number, now: number): boolean {
+    if (this.s.sulk <= 0 || amount <= 0) return false;
+    this.s.sulk = Math.max(0, this.s.sulk - amount);
+    if (this.s.sulk > 0) return false;
+    this.bump(0.15);
+    this.log(now, "삐진 게 풀렸어요. 이번만 봐준대요.");
+    return true;
   }
 
   /** 설렘을 순간적으로 올린다 */
@@ -388,6 +434,7 @@ export class Care {
     this.s.giftDay = day;
     this.bump(GIFT.mood, GIFT.affection);
     this.log(now, "선물을 줬어요. 아주 좋아했어요 🎁");
+    this.soothe(1, now);
     return true;
   }
 
@@ -555,6 +602,10 @@ export class Care {
         if (this.petTimes.length > 3) {
           this.bump(-0.08, -0.02);
           return "그만 좀 해!";
+        }
+        if (s.sulk > 0) {
+          this.bump(0.03);
+          return this.soothe(0.2, now) ? "…이번만 봐줄게" : "흥, 그런다고 안 풀려";
         }
         // 기분이 나쁠 때는 손을 탄다
         if (s.mood < 0.4) {

@@ -1,5 +1,7 @@
 import { type Care, localDay } from "../care/Care.ts";
 import type { DialogBox } from "../ui/DialogBox.ts";
+import { sulkScene } from "./away.ts";
+import { memoryOf, replayable } from "./memories.ts";
 import { DEFAULT_NAMES, personalize } from "./personalize.ts";
 import { INTRO_SCENE, STAGE_SCENES, greetingScene, pickTalk, type Scene } from "./scripts.ts";
 
@@ -11,7 +13,12 @@ export class Director {
   constructor(
     private readonly care: Care,
     private readonly dialog: DialogBox,
-  ) {}
+  ) {
+    // 앨범이 생기기 전에 본 장면도 추억으로 남긴다
+    const seen = care.s.memories;
+    if (care.s.introDone && !seen.includes("intro")) seen.push("intro");
+    for (let i = 1; i <= care.s.stageSeen; i++) if (!seen.includes(`stage-${i}`)) seen.push(`stage-${i}`);
+  }
 
   /** 오늘 처음이거나 오래 비웠다 왔으면 인사를 대기열에 넣는다 */
   greetIfNeeded(now: number): void {
@@ -25,7 +32,11 @@ export class Director {
     }
     if (this.care.s.greetedDay === day && this.care.awayHours < 12) return;
     this.care.s.greetedDay = day;
-    this.queue.push(greetingScene(new Date(now).getHours(), this.care.awayHours, this.care.s.hunger));
+    this.queue.push(
+      this.care.s.sulk > 0
+        ? sulkScene(this.care.s.sulkWhy === "jealous")
+        : greetingScene(new Date(now).getHours(), this.care.awayHours, this.care.s.hunger),
+    );
     this.care.awayHours = 0;
   }
 
@@ -39,14 +50,28 @@ export class Director {
     if (this.dialog.open) return;
     const care = this.care;
     const today = care.todayStats(now);
+    if (care.s.sulk > 0) {
+      today.talks++;
+      this.play(sulkScene(care.s.sulkWhy === "jealous"));
+      return;
+    }
     const scene = pickTalk({ stage: care.s.stageSeen, today, cleanliness: care.cleanliness, hunger: care.s.hunger }, care.s.recentTalks);
     care.s.recentTalks = [scene.id, ...care.s.recentTalks.filter((id) => id !== scene.id)].slice(0, 8);
     today.talks++;
     this.play(scene);
   }
 
+  /** 추억 앨범에서 다시 보기 */
+  replay(id: string): boolean {
+    const memory = memoryOf(id);
+    if (this.dialog.open || !memory || !this.care.s.memories.includes(id)) return false;
+    this.play(replayable(memory.scene));
+    return true;
+  }
+
   /** 대사 속 {name}·{me} 를 채워서 튼다 */
   private play(scene: Scene): void {
+    if (memoryOf(scene.id) && !this.care.s.memories.includes(scene.id)) this.care.s.memories.push(scene.id);
     const names = { name: this.care.s.name || DEFAULT_NAMES.name, me: this.care.s.callMe || DEFAULT_NAMES.me };
     const fill = (lines: Scene["lines"]) => lines.map((l) => ({ ...l, text: personalize(l.text, names) }));
     this.dialog.setSpeaker(names.name);

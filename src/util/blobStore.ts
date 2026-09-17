@@ -29,3 +29,13 @@ export async function getBlob(key: string): Promise<Blob | undefined> {
     req.onerror = () => reject(req.error);
   });
 }
+
+export async function delBlob(key: string): Promise<void> {
+  const db = await open();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}

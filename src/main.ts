@@ -3,7 +3,10 @@ import { BEHAVIOR_LABEL, Controller } from "./behavior/Controller.ts";
 import { BodyScene } from "./body/BodyScene.ts";
 import { FlyAvatar } from "./body/FlyAvatar.ts";
 import { createFallbackRig, loadVrmRig } from "./body/Rig.ts";
-import { getBlob, putBlob } from "./util/blobStore.ts";
+import { delBlob, getBlob, putBlob } from "./util/blobStore.ts";
+import { ATTEND_REWARDS, checkIn, claimQuests, questStatus } from "./care/Daily.ts";
+import { MEMORIES } from "./story/memories.ts";
+import { MiniGames, type GameResult } from "./ui/MiniGames.ts";
 import { NeuralField } from "./brain/NeuralField.ts";
 import { Raster } from "./brain/Raster.ts";
 import {
@@ -109,9 +112,23 @@ function celebrate(list: Achievement[]) {
   );
 }
 /** 돌봄 기록을 남기고 업적을 확인한다 (amount 0 이면 확인만) */
-const rec = (kind: keyof Totals, amount = 1) => celebrate(care.record(kind, Date.now(), amount));
+const rec = (kind: keyof Totals, amount = 1) => {
+  celebrate(care.record(kind, Date.now(), amount));
+  finishQuests();
+};
+
+/** 오늘의 부탁을 끝냈으면 알린다 */
+function finishQuests() {
+  const { done, bonus } = claimQuests(care, Date.now());
+  if (!done.length) return;
+  sfx.levelUp();
+  say(bonus ? "오늘 부탁 다 들어줬네! 고마워♡" : `부탁 들어줘서 고마워! (${done.map((q) => q.label).join(", ")})`, 3);
+  burst(innerWidth / 2, innerHeight * 0.45, bonus ? 12 : 5, ["📋", "💖"]);
+}
 
 controller.onEvent = (e) => {
+  // 손 뻗기 게임에서 도망가는 건 벌점 없이 게임 결과로만 친다
+  if (e === "scared" && games.active) return sfx.jump();
   say(care.on(e, Date.now()));
   const at = anchor();
   switch (e) {
@@ -127,6 +144,7 @@ controller.onEvent = (e) => {
       sfx.chew();
       burst(at.x, at.y, 2, ["♪"]);
       const kind = controller.eatingKind ?? "sweet";
+      if ((kind === "sweet" || kind === "honey") && care.soothe(0.35, Date.now())) setTimeout(() => say("…맛있으니까 봐줄게", 3), 1200);
       const label = SNACKS[kind].label;
       care.log(Date.now(), `${label}${hasBatchim(label) ? "을" : "를"} ${kind === "water" ? "마셨어요" : "먹었어요"}.`);
       // 달콤한 간식은 먹은 자리에 끈적한 얼룩을 남긴다
@@ -192,6 +210,7 @@ const dialog = new DialogBox($("dialog"), {
     const talks = care.todayStats(Date.now()).talks;
     care.bump(choice.mood ?? 0, talks <= 5 ? choice.affection ?? 0 : 0); // 하루 상한은 Care 가 한 번 더 건다
     if ((choice.affection ?? 0) > 0) care.thrillUp(0.25);
+    if (choice.sulk && care.soothe(choice.sulk, Date.now())) sfx.sparkle();
     if ((choice.affection ?? 0) > 0 || (choice.mood ?? 0) > 0) {
       const at = anchor();
       burst(at.x, at.y, 4);
@@ -367,6 +386,46 @@ function wakeUp() {
     say(`기다리면서 하트 ${got}개 모았어!`, 3);
     setTimeout(() => burst(innerWidth / 2, innerHeight * 0.5, Math.min(10, got), ["💖"]), 400);
   }
+  const stamp = checkIn(care, Date.now());
+  if (stamp) {
+    setTimeout(() => {
+      say(`출석 ${stamp.streak}일째! 하트 ${stamp.reward}개 줄게`, 3);
+      burst(innerWidth / 2, innerHeight * 0.5, stamp.streak % 7 === 0 ? 14 : 5, ["📅", "💖"]);
+    }, 1800);
+  }
+  showLetter(greet);
+}
+
+/** 자리를 비운 동안 남긴 편지를 보여 주고, 닫으면 then */
+function showLetter(then: () => void) {
+  const letter = care.s.letter;
+  if (!letter) return then();
+  const names = { name: charName(), me: care.s.callMe || DEFAULT_NAMES.me };
+  const box = document.createElement("section");
+  box.className = "letter";
+  box.setAttribute("role", "dialog");
+  for (const line of letter.lines) {
+    const p = document.createElement("p");
+    p.textContent = personalize(line, names);
+    box.append(p);
+  }
+  const ok = document.createElement("button");
+  ok.textContent = letter.gift ? `${SNACKS[letter.gift].emoji} 받고 닫기` : "고마워";
+  ok.onclick = () => {
+    if (letter.gift) care.s.stock[letter.gift]++;
+    care.log(Date.now(), `✉️ ${charName()}의 편지를 읽었어요${letter.gift ? ` (${SNACKS[letter.gift].label} 선물)` : ""}.`);
+    care.s.letter = null;
+    box.remove();
+    sfx.choice();
+    then();
+  };
+  box.append(ok);
+  document.body.append(box);
+  sfx.sparkle();
+}
+
+/** 돌아왔을 때 인사 (특별한 날·이스터에그 포함) */
+function greet() {
   const now = new Date();
   if (care.s.asleep) say("💤", 2, true);
   else if (is404(now)) {
@@ -465,6 +524,8 @@ function talk() {
   rec("talks");
 }
 
+const ALBUM_MAX = 12;
+
 /** 📷 지금 화면을 저장하고, 작게 줄여 액자에 건다 */
 function takePhoto() {
   if (!ready) return;
@@ -481,6 +542,13 @@ function takePhoto() {
     c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
     care.s.photo = c.toDataURL("image/jpeg", 0.75);
     body.setPhoto(care.s.photo);
+    const t = Date.now();
+    c.toBlob((blob) => {
+      if (!blob) return;
+      void putBlob(`photo-${t}`, blob);
+      for (const old of care.s.album.slice(ALBUM_MAX - 1)) void delBlob(`photo-${old}`);
+      care.s.album = [t, ...care.s.album].slice(0, ALBUM_MAX);
+    }, "image/jpeg", 0.8);
   };
   img.src = url;
   document.body.classList.remove("flash");
@@ -501,19 +569,20 @@ function updateLightButton() {
   $("btn-light").querySelector("em")!.textContent = care.s.lightsOn ? "불 끄기" : "불 켜기";
 }
 
-type PanelId = "brain-panel" | "diary-panel" | "shop-panel";
+type PanelId = "brain-panel" | "diary-panel" | "shop-panel" | "album-panel";
 
 function togglePanel(id: PanelId, open?: boolean) {
   const panel = $(id);
   const show = open ?? panel.hidden;
   // 서랍은 한 번에 하나만
-  if (show) for (const other of ["brain-panel", "diary-panel", "shop-panel"] as PanelId[]) if (other !== id) $(other).hidden = true;
+  if (show) for (const other of ["brain-panel", "diary-panel", "shop-panel", "album-panel"] as PanelId[]) if (other !== id) $(other).hidden = true;
   panel.hidden = !show;
   if (id === "brain-panel") {
     $("btn-brain").setAttribute("aria-expanded", String(show));
     if (show) openBrain();
   } else if (show) {
     if (id === "diary-panel") renderDiary();
+    else if (id === "album-panel") renderAlbum();
     else renderShop();
   }
 }
@@ -566,6 +635,9 @@ $("btn-scare").onclick = () => {
 $("btn-light").onclick = toggleLights;
 $("btn-brain").onclick = () => togglePanel("brain-panel");
 $("btn-diary").onclick = () => togglePanel("diary-panel");
+$("btn-album").onclick = () => togglePanel("album-panel");
+$("btn-reach").onclick = () => startGame("reach");
+$("btn-catch").onclick = () => startGame("catch");
 $("btn-shop").onclick = () => togglePanel("shop-panel");
 $("btn-photo").onclick = takePhoto;
 for (const btn of document.querySelectorAll<HTMLElement>("[data-close]")) {
@@ -604,7 +676,7 @@ window.addEventListener("keydown", (e) => {
     egg("konami", 30, "코나미 커맨드", "지금 내 뉴런… 13만 8천 개 다 켜졌어?!");
     return;
   }
-  if (dialog.open) return;
+  if (dialog.open || games.active) return;
   if (e.key === "Escape") {
     togglePanel("brain-panel", false);
     togglePanel("diary-panel", false);
@@ -645,6 +717,8 @@ function frameLoop(now: number) {
 
   const hour = hourOf(Date.now());
   care.passTime(dt, hour);
+  controller.sulking = care.s.sulk > 0 && !dialog.open;
+  games.update(dt);
   // 뇌 시뮬이 실시간보다 느리면 몸도 같은 비율로 느려진다
   const worldDt = ready && simRunning ? dt * Math.min(simSpeed, 1) : 0;
   if (worldDt > 0) {
@@ -663,7 +737,7 @@ function frameLoop(now: number) {
     for (const g of SENSORY_GROUPS) sendStim(g, rates[g]);
   }
   body.render(dt, controller.state, habitat.foods, care.s.messes, care.s.lightsOn, care.s.mood);
-  const panelsOpen = !$("brain-panel").hidden || !$("diary-panel").hidden;
+  const panelsOpen = !$("brain-panel").hidden || !$("diary-panel").hidden || !$("album-panel").hidden || games.active;
   director.update(Date.now(), ready && !care.s.asleep && !panelsOpen && controller.state.behavior === "walk");
   if (!$("brain-panel").hidden) {
     neural?.render();
@@ -677,7 +751,7 @@ function frameLoop(now: number) {
     else if (t > nextAmbient) {
       nextAmbient = t + 7 + Math.random() * 6;
       const s = care.s;
-      say(s.hunger > 0.75 ? "배고파…" : s.sleepiness > 0.8 ? "졸려…" : care.cleanliness < 0.5 ? "방이 지저분해…" : s.mood < 0.3 ? "흥…" : s.mood > 0.5 && Math.random() < 0.6 ? personalize(mutter(s.stageSeen), { name: charName(), me: s.callMe || DEFAULT_NAMES.me }) : null);
+      say(s.sulk > 0 ? (s.sulkWhy === "jealous" ? "…흥, 누구랑 있었는데" : "흥…") : s.hunger > 0.75 ? "배고파…" : s.sleepiness > 0.8 ? "졸려…" : care.cleanliness < 0.5 ? "방이 지저분해…" : s.mood < 0.3 ? "흥…" : s.mood > 0.5 && Math.random() < 0.6 ? personalize(mutter(s.stageSeen), { name: charName(), me: s.callMe || DEFAULT_NAMES.me }) : null);
     } else $("bubble").hidden = true;
   }
   const anchor = $("bubble").hidden ? null : body.bubbleAnchor();
@@ -801,7 +875,7 @@ function updateUi() {
   setGauge("g-love", s.affection);
   $("days").textContent = `함께한 지 ${care.daysTogether()}일`;
   $("heart-count").textContent = String(Math.floor(care.s.hearts));
-  $("stage").textContent = `💞 ${STAGES[care.s.stageSeen].name}${care.s.title ? ` · 🍓${care.s.title}` : ""}`;
+  $("stage").textContent = `💞 ${STAGES[care.s.stageSeen].name}${care.s.title ? ` · 🍓${care.s.title}` : ""}${care.s.sulk > 0 ? " · 💢삐짐" : ""}`;
 
   const state = controller.state;
   const label = BEHAVIOR_LABEL[Controller.displayBehavior(state)];
@@ -930,4 +1004,136 @@ function renderDiary() {
       return li;
     }),
   );
+}
+
+// ---------------------------------------------------------------- 질투
+const JEALOUS_AFTER_MS = 30 * 60_000;
+let hiddenAt = 0;
+document.addEventListener("visibilitychange", () => {
+  const now = Date.now();
+  if (document.hidden) {
+    hiddenAt = now;
+    return;
+  }
+  const away = now - hiddenAt;
+  // 창을 닫아 둔 긴 시간은 "자리 비움"이지 질투가 아니다
+  if (!ready || !hiddenAt || away < JEALOUS_AFTER_MS || away > 6 * 3.6e6) return;
+  if (care.s.asleep || care.s.stageSeen < 2 || care.s.sulk > 0) return;
+  care.sulkUp(0.5, now, "jealous");
+  setTimeout(() => say("…다른 창에서 누구 만나고 왔어?", 4), 600);
+});
+
+// ---------------------------------------------------------------- 미니게임
+const games = new MiniGames({
+  anchor: () => anchor(),
+  setLooming: (hz) => (habitat.loomHz = hz),
+  giantFiber: () => controller.rates.escape,
+  escaped: () => controller.state.behavior === "escape",
+  onEnd: endGame,
+});
+const PAID_GAMES_PER_DAY = 3;
+
+function startGame(which: "reach" | "catch") {
+  setPrank(false);
+  if (!ready || dialog.open || games.active) return;
+  if (care.s.asleep) return say("쿨쿨…");
+  for (const id of ["brain-panel", "diary-panel", "shop-panel", "album-panel"] as PanelId[]) togglePanel(id, false);
+  if (which === "reach") games.startReach();
+  else games.startCatch();
+}
+
+function endGame(r: GameResult) {
+  const now = Date.now();
+  const today = care.todayStats(now);
+  const paid = (today.games ?? 0) < PAID_GAMES_PER_DAY;
+  const center = () => [innerWidth / 2, innerHeight * 0.45] as const;
+  if (r.game === "reach") {
+    if (r.reason === "win") {
+      today.games = (today.games ?? 0) + 1;
+      const reward = paid ? 15 : 0;
+      care.s.hearts += reward;
+      care.bump(0.15, 0.008);
+      care.thrillUp(0.6);
+      sfx.levelUp();
+      burst(...center(), 12, ["💓", "💖"]);
+      say(care.s.stageSeen >= 3 ? "잡혔다… 헤헤, 두근거렸어♡" : "앗, 잡혔다! …생각보다 조심스럽네.", 3);
+      care.log(now, `🤚 살금살금 손 뻗기 성공! Giant Fiber를 참아 냈어요${reward ? ` (+${reward} 하트)` : ""}.`);
+      rec("pets");
+    } else if (r.reason === "escaped") {
+      care.bump(-0.05);
+      say("휙! 너무 빨랐어!", 3);
+      care.log(now, "🤚 손을 뻗었더니 Giant Fiber가 켜져서 도망갔어요.");
+    } else say("…손은 왜 멈춘 거야?", 3);
+  } else {
+    today.games = (today.games ?? 0) + 1;
+    const reward = paid ? Math.min(20, r.berries) : 0;
+    const kept = Math.floor(r.berries / 10);
+    care.s.hearts += reward;
+    care.s.stock.sweet += kept;
+    if (r.berries > 0) burst(...center(), Math.min(12, r.berries), ["🍓"]);
+    say(r.berries >= 10 ? `딸기 ${r.berries}개! 나 주는 거지?` : r.berries > 0 ? `딸기 ${r.berries}개 받았다!` : "하나도 못 받았어…", 3);
+    care.log(now, `🧺 딸기 받기: ${r.berries}개${reward ? ` (+${reward} 하트)` : ""}${kept ? `, 딸기 ${kept}개 보관` : ""}.`);
+  }
+}
+
+// ---------------------------------------------------------------- 추억과 오늘
+function renderAlbum() {
+  const now = Date.now();
+  const s = care.s;
+  const yesterday = localDay(now - 86_400_000);
+  const streak = s.attend.last === localDay(now) || s.attend.last === yesterday ? s.attend.streak : 0;
+  const stamped = s.attend.last === localDay(now) ? ((streak - 1) % ATTEND_REWARDS.length) + 1 : streak % ATTEND_REWARDS.length;
+  $("album-streak").textContent = `연속 ${streak}일`;
+  $("album-attend").replaceChildren(
+    ...ATTEND_REWARDS.map((reward, i) => {
+      const span = document.createElement("span");
+      span.className = i < stamped ? "on" : "";
+      span.textContent = i < stamped ? "✔" : `${reward}💖`;
+      span.title = `${i + 1}일째`;
+      return span;
+    }),
+  );
+
+  $("album-quests").replaceChildren(
+    ...questStatus(care, now).map(({ quest, progress, done }) => {
+      const li = document.createElement("li");
+      li.className = done ? "done" : "";
+      const name = document.createElement("span");
+      name.textContent = quest.label;
+      const reward = document.createElement("small");
+      reward.textContent = done ? "✔" : `${progress}/${quest.goal} · +${quest.reward}💖`;
+      const bar = document.createElement("progress");
+      bar.max = quest.goal;
+      bar.value = progress;
+      li.append(name, reward, bar);
+      return li;
+    }),
+  );
+
+  $("album-memories").replaceChildren(
+    ...MEMORIES.map((m) => {
+      const seen = s.memories.includes(m.id);
+      const item = shopItem(seen ? m.emoji : "🔒", seen ? m.title : "???", seen ? "눌러서 다시 보기" : "아직 보지 못한 장면", null, !seen, () => {
+        togglePanel("album-panel", false);
+        director.replay(m.id);
+      });
+      item.querySelector(".price")!.textContent = seen ? "▶" : "";
+      return item;
+    }),
+  );
+
+  const photos = $("album-photos");
+  photos.replaceChildren();
+  if (!s.album.length) photos.textContent = "아직 찍은 사진이 없어요. 📷 버튼으로 찍어 보세요.";
+  for (const t of s.album) {
+    const img = new Image();
+    img.alt = new Date(t).toLocaleString("ko-KR");
+    img.title = img.alt;
+    img.onload = () => URL.revokeObjectURL(img.src);
+    photos.append(img);
+    void getBlob(`photo-${t}`).then((blob) => {
+      if (blob) img.src = URL.createObjectURL(blob);
+      else img.remove();
+    });
+  }
 }

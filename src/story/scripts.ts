@@ -12,6 +12,8 @@ export interface Choice {
   label: string;
   mood?: number;
   affection?: number;
+  /** 삐짐을 이만큼 풀어 준다 */
+  sulk?: number;
   reply: Line[];
 }
 

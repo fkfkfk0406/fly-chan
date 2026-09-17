@@ -27,6 +27,7 @@
         <button id="btn-photo" class="round" aria-label="사진 찍기">📷</button>
         <button id="btn-mute" class="round" aria-label="소리 끄기">🔊</button>
         <button id="btn-diary" class="round" aria-label="일기">📔</button>
+        <button id="btn-album" class="round" aria-label="추억과 오늘의 부탁">🎞️</button>
       </div>
     </header>
 
@@ -46,8 +47,10 @@
       <button id="btn-pet"><span aria-hidden="true">✋</span>쓰담</button>
       <button id="btn-clean"><span aria-hidden="true">🧹</span>청소</button>
       <div class="prank">
-        <button id="btn-prank" aria-expanded="false"><span aria-hidden="true">😈</span>장난</button>
+        <button id="btn-prank" aria-expanded="false"><span aria-hidden="true">🎲</span>놀이</button>
         <div class="menu" id="prank-menu" hidden>
+          <button id="btn-reach">🤚 살금살금 손 뻗기</button>
+          <button id="btn-catch">🧺 딸기 받기</button>
           <button id="btn-bitter">🍄 쓴 버섯 주기</button>
           <button id="btn-scare">👻 깜짝 놀래키기</button>
         </div>
@@ -115,6 +118,26 @@
         <input type="file" id="vrm-file" accept=".vrm,.glb" hidden />
         <h3>선물</h3>
         <div class="shop-list" id="shop-gift"></div>
+      </div>
+    </aside>
+
+    <aside class="drawer album" id="album-panel" hidden>
+      <div class="drawer-head">
+        <div>
+          <span class="kicker">MEMORIES</span>
+          <h2>추억과 오늘</h2>
+        </div>
+        <button class="close" data-close="album-panel" aria-label="닫기">✕</button>
+      </div>
+      <div class="drawer-body">
+        <h3>출석 <small id="album-streak"></small></h3>
+        <div class="attend" id="album-attend"></div>
+        <h3>오늘의 부탁</h3>
+        <ul class="quests" id="album-quests"></ul>
+        <h3>추억 다시 보기</h3>
+        <div class="shop-list" id="album-memories"></div>
+        <h3>사진</h3>
+        <div class="photos" id="album-photos"></div>
       </div>
     </aside>
 

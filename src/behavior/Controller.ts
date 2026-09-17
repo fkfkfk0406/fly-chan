@@ -47,6 +47,8 @@ export class Controller {
   onEvent: (e: CareEvent) => void = () => {};
   /** 대화창이 열려 있으면 제자리에서 사용자 쪽을 본다 */
   talking = false;
+  /** 삐져서 사용자에게 등을 돌린다 */
+  sulking = false;
 
   private wanderTurn = 0;
   private pauseUntil = 0;
@@ -246,6 +248,13 @@ export class Controller {
         }
         this.atFoodSince = -1;
         if (this.refusedFood >= 0 && c.hunger > 0.45) this.refusedFood = -1;
+
+        if (this.sulking) {
+          targetTurn = wrapAngle(Math.atan2(s.x - CAMERA_HOME.x, s.z - CAMERA_HOME.z) - s.heading) * 3;
+          targetSpeed = 0;
+          s.cause = "삐져서 등 돌림";
+          break;
+        }
 
         if (now < this.visitUntil) {
           const dist = steerTo(USER_SPOT.x, USER_SPOT.z, 0.2, 0.55);

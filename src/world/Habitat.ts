@@ -65,6 +65,8 @@ export class Habitat {
   lightsOn = true;
   private nextId = 1;
   private threatUntil = 0;
+  /** 미니게임에서 다가오는 손의 루밍 세기 (Hz) */
+  loomHz = 0;
   private petUntil = 0;
   // 벽 접촉은 닿는 순간 짧게 한 번만. 그루밍하느라 벽에 붙어 서 있어도 계속 자극하지 않게,
   // 벽에서 충분히 떨어져야 다시 발동한다.
@@ -145,7 +147,7 @@ export class Habitat {
     const rates: Record<SensoryGroup, number> = {
       sugar: 0, bitter: 0, water: 0, pharynx_sugar: 0, ir94e: 0,
       jo_touch: now < this.petUntil ? 160 : now < this.wallTouchUntil ? 140 : 0,
-      looming: now < this.threatUntil ? 220 : 0,
+      looming: now < this.threatUntil ? 220 : this.loomHz,
       // 눈을 감고 있거나 불이 꺼져 있으면 광수용체 입력 없음
       light: this.lightsOn && !asleep ? 8 : 0,
       pc1: asleep ? 0 : clamp(thrill, 0, 1) * PC1_MAX_HZ,
