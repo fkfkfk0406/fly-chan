@@ -28,7 +28,9 @@
 
 ## 바로 이어서 할 일
 
-1. **데스크톱 앱 실제 확인**: `npm run desktop`으로 창·트레이·항상 위·숨김 후 경과 시간 확인 → `npm run desktop:build`로 설치 파일을 만들어 첫 실행 다운로드 확인 → 설치 파일을 Releases(예: `v0.1.0`)에 올리기.
+1. **데스크톱 앱 실제 확인**: `npm run desktop`으로 창·트레이·항상 위·숨김 후 경과 시간 확인 → 저장소 공개 후 첫 태그 `git tag v0.1.0 && git push origin v0.1.0`으로 Actions 빌드 확인 → 설치해서 첫 실행 다운로드 확인 → 버전을 올려(`npm run release`) 앱의 업데이트 알림 확인.
+   - 업데이터·Actions는 넣었지만(`.github/workflows/release.yml`, `src/desktop.ts`) CI 빌드와 실제 업데이트는 아직 한 번도 돌려 보지 않음.
+   - 서명 개인 키: 이 노트북 `~/.tauri/fly-chan.key` + 저장소 Secret. 다른 곳에 백업 필요.
 2. **육성 데이터 내보내기/불러오기**: 저장 상태(JSON)를 파일로 내보내고 불러오는 버튼. PC를 옮겨도 이어서 키울 수 있게.
 3. **스마트폰 배포 (PWA)**: 홈 화면 설치, 알림("배고파…"), 데이터 캐시(`src/util/assets.ts` 재사용), 호스팅 결정.
 4. **버섯체 학습**: 도파민 뉴런과 Kenyon cell → MBON 가소성으로 "쓴 걸 줬던 기억"을 진짜 뇌에 남기기. 난이도 높음.

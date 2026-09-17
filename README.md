@@ -83,6 +83,17 @@ npm run desktop:build   # 설치 파일 → src-tauri/target/release/bundle/nsis
 - 설치 파일에는 뇌 데이터·VRM이 들어 있지 않고, 첫 실행 때 [Releases `data-v783`](https://github.com/fkfkfk0406/fly-chan/releases/tag/data-v783)에서 한 번(약 104 MB) 받아 둡니다.
 - ✕는 트레이로 숨기기입니다. 트레이 메뉴에서 항상 위, 컴퓨터 켜면 같이 시작, 종료를 고릅니다.
 - 숨겨 둔 동안은 뇌 시뮬을 멈추고, 다시 열면 지난 시간만큼 배고픔 등이 반영됩니다.
+- 설치된 앱은 켤 때와 6시간마다 새 버전을 확인하고, "업데이트"를 누르면 받아서 다시 실행합니다. 육성 저장과 받아 둔 뇌 데이터는 그대로 남아요.
+
+**새 버전 배포 (관리자용)**
+
+```bash
+npm run release   # package.json 버전을 올려 커밋·태그(v0.1.1 …)를 만들고 푸시
+```
+
+태그가 올라가면 GitHub Actions(`.github/workflows/release.yml`)가 설치 파일을 빌드·서명해서 Releases에 올리고, 앱이 읽는 `latest.json`도 함께 올립니다.
+- 서명 키: 개인 키는 저장소 Secret `TAURI_SIGNING_PRIVATE_KEY`, 공개 키는 `src-tauri/tauri.conf.json`에 있습니다. 개인 키를 잃어버리면 이미 설치된 앱에 업데이트를 보낼 수 없습니다.
+- 뇌 데이터를 바꿀 때는 새 태그(예: `data-v784`)로 **사전 릴리스(prerelease)** 로 올리고 `src/util/assets.ts`의 `RELEASE_TAG`를 바꿉니다. 앱이 새 데이터를 받고 예전 것은 지웁니다. 사전 릴리스로 올려야 앱 업데이트 확인(`releases/latest`)을 가로채지 않습니다.
 
 ### 개발용 옵션
 

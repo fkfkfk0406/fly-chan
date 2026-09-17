@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "플라이쨩 메인 창: 제목 줄 조작, 뇌 데이터 받기(GitHub Releases)",
+  "description": "플라이쨩 메인 창: 제목 줄 조작, 뇌 데이터 받기와 앱 업데이트(GitHub Releases)",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -9,6 +9,8 @@
     "core:window:allow-minimize",
     "core:window:allow-hide",
     "core:window:allow-set-always-on-top",
+    "updater:default",
+    "process:allow-restart",
     {
       "identifier": "http:default",
       "allow": [

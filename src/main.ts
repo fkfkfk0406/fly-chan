@@ -1163,4 +1163,4 @@ function renderAlbum() {
 }
 
 // ---------------------------------------------------------------- 데스크톱
-if (IS_DESKTOP) void setupDesktop();
+if (IS_DESKTOP) void setupDesktop(save);

@@ -11,12 +11,15 @@
     "probe": "node scripts/probe.ts",
     "tauri": "tauri",
     "desktop": "tauri dev",
-    "desktop:build": "tauri build"
+    "desktop:build": "tauri build",
+    "release": "npm version patch -m \"release: v%s\" && git push --follow-tags"
   },
   "dependencies": {
     "@pixiv/three-vrm": "^3.5.5",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-http": "^2.6.1",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.11.0",
     "three": "^0.186.0"
   },
   "devDependencies": {

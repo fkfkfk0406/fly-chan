@@ -73,4 +73,8 @@ export async function ensureAssets(onProgress: (loaded: number, label: string) =
     if (size && got !== size) throw new Error(`${releaseName(path)} 다운로드가 중간에 끊겼어요. 다시 실행해 주세요.`);
     await cache.put(cacheKey(path), new Response(new Blob(chunks), { headers: { "content-length": String(got) } }));
   }
+  // 데이터가 새 태그로 바뀌었으면 예전에 받아 둔 것을 지운다
+  for (const name of await caches.keys()) {
+    if (name.startsWith("fly-chan-assets-") && name !== CACHE) await caches.delete(name);
+  }
 }

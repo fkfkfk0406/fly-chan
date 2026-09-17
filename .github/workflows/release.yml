@@ -1,0 +1,46 @@
+# v로 시작하는 태그를 푸시하면 Windows 설치 파일을 빌드·서명해서 Releases 에 올린다.
+# 함께 올라가는 latest.json 을 설치된 앱의 업데이터가 읽는다.
+# 새 버전 내기: npm run release  (package.json 버전 올리기 → 커밋·태그 → 푸시)
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "플라이쨩 v__VERSION__"
+          releaseBody: |
+            Windows 설치 파일: `Fly-chan_*_x64-setup.exe`
+            처음 실행하면 뇌 데이터(약 104 MB)를 한 번 받습니다. 이미 설치했다면 앱이 알아서 업데이트를 알려 줍니다.
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
