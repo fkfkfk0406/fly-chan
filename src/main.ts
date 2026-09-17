@@ -4,6 +4,8 @@ import { BodyScene } from "./body/BodyScene.ts";
 import { FlyAvatar } from "./body/FlyAvatar.ts";
 import { createFallbackRig, loadVrmRig } from "./body/Rig.ts";
 import { delBlob, getBlob, putBlob } from "./util/blobStore.ts";
+import { IS_DESKTOP, assetUrl, ensureAssets, fetchAsset } from "./util/assets.ts";
+import { setupDesktop } from "./desktop.ts";
 import { ATTEND_REWARDS, checkIn, claimQuests, questStatus } from "./care/Daily.ts";
 import { MEMORIES } from "./story/memories.ts";
 import { MiniGames, type GameResult } from "./ui/MiniGames.ts";
@@ -34,7 +36,6 @@ const [TAU_W, B_ADAPT] = (params.get("adapt") ?? "").split(":").map(Number);
 const ADAPTATION = TAU_W > 0 && B_ADAPT > 0 ? { tauW: TAU_W, b: B_ADAPT } : NO_ADAPTATION;
 // 돌봄 시간 배속. ?time=60 이면 1분이 1시간
 const TIME_SCALE = Number(params.get("time")) || 1;
-const BASE = import.meta.env.BASE_URL;
 const MAX_FOODS = 3;
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -247,10 +248,12 @@ async function applyAvatar(kind: AvatarKind): Promise<boolean> {
       body.setRig(await loadVrmRig(url), "custom");
       URL.revokeObjectURL(url);
     } else {
-      const rig = await loadVrmRig(`${BASE}models/onna.vrm`).catch((err) => {
+      const vrm = await assetUrl("models/fly-chan.vrm");
+      const rig = await loadVrmRig(vrm.url).catch((err) => {
         console.warn("VRM 로드 실패, 도형 인형으로 대체합니다:", err);
         return createFallbackRig();
       });
+      if (vrm.revoke) URL.revokeObjectURL(vrm.url);
       body.setRig(rig, "girl");
     }
     care.s.avatar = kind;
@@ -319,7 +322,7 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
   switch (msg.type) {
     case "progress":
       $("load-bar").style.width = `${(msg.loaded / msg.total) * 100}%`;
-      $("load-label").textContent = `온나의 뇌를 깨우는 중… ${(msg.loaded / 1e6).toFixed(0)} / ${(msg.total / 1e6).toFixed(0)} MB`;
+      $("load-label").textContent = `${charName()}의 뇌를 깨우는 중… ${(msg.loaded / 1e6).toFixed(0)} / ${(msg.total / 1e6).toFixed(0)} MB`;
       break;
     case "ready":
       raster.setNames(msg.probeNames);
@@ -343,7 +346,18 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
       break;
   }
 };
-send({ type: "init", dt: DT_MS, adaptation: ADAPTATION });
+// 데스크톱은 첫 실행 때 뇌 데이터를 받은 다음 워커를 깨운다
+const ASSET_TOTAL_MB = 104;
+void ensureAssets((loaded, label) => {
+  $("load-bar").style.width = `${Math.min(100, (loaded / ASSET_TOTAL_MB / 1e6) * 100)}%`;
+  $("load-label").textContent = `처음 한 번만 뇌 데이터를 받는 중… ${(loaded / 1e6).toFixed(0)} / ${ASSET_TOTAL_MB} MB (${label})`;
+})
+  .then(() => send({ type: "init", dt: DT_MS, adaptation: ADAPTATION }))
+  .catch((err: Error) => {
+    $("overlay").hidden = false;
+    $("overlay").querySelector(".loading")!.classList.add("error");
+    $("load-label").textContent = err.message;
+  });
 
 const raster = new Raster($<HTMLCanvasElement>("raster"));
 
@@ -359,8 +373,8 @@ function onFrame(frame: SimFrame) {
 async function openBrain() {
   if (!meta || neural) return;
   const [pos, cls] = await Promise.all([
-    fetch(`${BASE}data/neurons_pos.f32`).then((r) => r.arrayBuffer()),
-    fetch(`${BASE}data/neurons_class.u8`).then((r) => r.arrayBuffer()),
+    fetchAsset("data/neurons_pos.f32").then((r) => r.arrayBuffer()),
+    fetchAsset("data/neurons_class.u8").then((r) => r.arrayBuffer()),
   ]);
   neural = new NeuralField($("neural-view"), new Float32Array(pos), new Uint8Array(cls), meta.classes);
 }
@@ -700,10 +714,20 @@ function sendStim(group: SensoryGroup, rate: number) {
 
 // ---------------------------------------------------------------- 저장
 const save = () => care.save(Date.now());
-setInterval(save, 10_000);
+setInterval(() => document.hidden || save(), 10_000); // 숨겨진 동안엔 lastSeen 을 멈춰 둬야 돌아올 때 경과 시간을 안다
 window.addEventListener("pagehide", save);
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) save();
+  if (document.hidden) {
+    save();
+    send({ type: "pause" }); // 안 보이는 동안 뇌 시뮬을 멈춰 CPU 를 아낀다
+    return;
+  }
+  if (simRunning) send({ type: "resume" });
+  lastTime = performance.now();
+  if (!ready || !care.resume(Date.now())) return;
+  const got = care.collectPending(Date.now());
+  if (got > 0) say(`기다리면서 하트 ${got}개 모았어!`, 3);
+  showLetter(() => director.greetIfNeeded(Date.now()));
 });
 
 // ---------------------------------------------------------------- 루프
@@ -767,7 +791,7 @@ function frameLoop(now: number) {
 requestAnimationFrame(frameLoop);
 
 // 개발 중 콘솔에서 상태를 만져 볼 수 있게
-if (import.meta.env.DEV) Object.assign(window, { onna: { controller, habitat, care, director, dialog } });
+if (import.meta.env.DEV) Object.assign(window, { flychan: { controller, habitat, care, director, dialog } });
 
 // ---------------------------------------------------------------- 상점
 function shopItem(
@@ -1017,7 +1041,7 @@ document.addEventListener("visibilitychange", () => {
   }
   const away = now - hiddenAt;
   // 창을 닫아 둔 긴 시간은 "자리 비움"이지 질투가 아니다
-  if (!ready || !hiddenAt || away < JEALOUS_AFTER_MS || away > 6 * 3.6e6) return;
+  if (IS_DESKTOP || !ready || !hiddenAt || away < JEALOUS_AFTER_MS || away > 6 * 3.6e6) return;
   if (care.s.asleep || care.s.stageSeen < 2 || care.s.sulk > 0) return;
   care.sulkUp(0.5, now, "jealous");
   setTimeout(() => say("…다른 창에서 누구 만나고 왔어?", 4), 600);
@@ -1137,3 +1161,6 @@ function renderAlbum() {
     });
   }
 }
+
+// ---------------------------------------------------------------- 데스크톱
+if (IS_DESKTOP) void setupDesktop();

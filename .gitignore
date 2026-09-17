@@ -4,3 +4,5 @@ pipeline/.venv/
 pipeline/raw/
 public/data/
 public/models/*.vrm
+src-tauri/target/
+src-tauri/gen/

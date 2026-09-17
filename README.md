@@ -1,9 +1,9 @@
-# ONNA: 초파리 뇌를 가진 소녀
+# 플라이쨩 (Fly-chan): 초파리 뇌를 가진 소녀
 
-초파리 전뇌 커넥톰(FlyWire v783, 뉴런 138,639개, 시냅스 5,449만 개)을 브라우저에서 LIF 모델로 실시간으로 돌리는 3D 다마고치입니다. 방 안의 온나(VRM + 더듬이·날개)는 그 뇌의 출력으로 먹고, 놀라고, 더듬이를 손질합니다.
+초파리 전뇌 커넥톰(FlyWire v783, 뉴런 138,639개, 시냅스 5,449만 개)을 브라우저에서 LIF 모델로 실시간으로 돌리는 3D 다마고치입니다. 방 안의 플라이쨩(VRM + 더듬이·날개)는 그 뇌의 출력으로 먹고, 놀라고, 더듬이를 손질합니다.
 
 **화면**
-- **방:** 전체 화면 3D 디오라마입니다. 드래그로 돌리고 휠로 확대할 수 있고, 온나를 탭하면 쓰다듬어요. 머리 위 말풍선으로 반응을 보여 줍니다.
+- **방:** 전체 화면 3D 디오라마입니다. 드래그로 돌리고 휠로 확대할 수 있고, 플라이쨩을 탭하면 쓰다듬어요. 머리 위 말풍선으로 반응을 보여 줍니다.
 - **상단 게이지:** 배부름, 기운, 기분, 청결, 애정. 📔 버튼을 누르면 일기(함께한 날, 최근 사건)가 열립니다.
 - **하단 돌봄:** 🍓 간식(딸기·꿀·물·짠 과자), 💬 대화, ✋ 쓰담, 🧹 청소, 😈 장난(쓴 버섯 주기, 깜짝 놀래키기), 💡 불 끄기/켜기, 🧠 뇌 보기
 - **뇌 보기:** 뉴런 점 구름, 하강·운동 뉴런 발화율, 지금 들어오는 감각 입력, 행동의 원인, 시뮬 속도를 보여 줍니다.
@@ -20,7 +20,7 @@
 | 불 끄기 | R7·R8 빛 입력 끔 | (졸리면 침대로 가서 잠) |
 
 **첫 만남**
-- 처음 열면 뇌 데이터를 받는 동안 캐릭터 이름(기본 "온나")과 나를 부를 호칭(기본 "너")을 정합니다. 대사에는 받침에 맞는 조사로 들어가요(`src/story/personalize.ts`).
+- 처음 열면 뇌 데이터를 받는 동안 캐릭터 이름(기본 "플라이쨩")과 나를 부를 호칭(기본 "너")을 정합니다. 대사에는 받침에 맞는 조사로 들어가요(`src/story/personalize.ts`).
 
 **난이도: 초파리의 마음은 쉽게 열리지 않아요**
 - 애정 5%, 낯섦 단계에서 시작합니다.
@@ -37,7 +37,7 @@
 - 꾸미기: 🎀 리본(머리), 🧣 목도리, 🪴 화분, 🖼️ 액자. 한 번 사면 계속 남습니다.
 - 🎁 선물은 하루 한 번(35 하트), 애정이 조금 더 오릅니다.
 
-**간식과 취향** — 온나만의 부분
+**간식과 취향** — 플라이쨩만의 부분
 - 간식마다 자극하는 미각 뉴런이 다릅니다(`SNACKS` in `src/world/Habitat.ts`). 물과 Ir94e 뉴런 ID는 Shiu et al. 노트북(`figures.ipynb`)의 `neu_water`·`neu_ir94e`와 18개씩 정확히 일치하는지 대조했습니다.
 - 먹거나 맛보는 동안 MN9 발화율을 간식별 최고치로 기록해, 일기에서 "뇌가 알려 준 취향"으로 보여 줍니다. 좋아하는 정도는 대본이 아니라 실제 시뮬 반응이에요.
 - 처음 보는 간식은 배가 불러도 호기심에 한 번 다가가 맛봅니다.
@@ -79,6 +79,18 @@ npm run dev       # http://localhost:5173
 - `npm run probe -- sugar:150`은 감각 그룹을 자극하고 가장 많이 발화한 하강·운동 뉴런을 출력합니다.
 - `node scripts/bench.ts`는 대표 상황에서 시뮬 속도를 잽니다.
 - `node scripts/adapt.ts 300:1 500:2`는 적응 파라미터별로 감각 적응, 냄새 폭주, 속도를 한 번에 비교합니다.
+
+### 데스크톱 앱 (Windows)
+
+작은 창으로 띄워 두고 트레이에 상주하는 버전입니다([Tauri](https://tauri.app), Rust 필요).
+
+```bash
+npm run desktop         # 개발 실행 (public/data 를 그대로 사용)
+npm run desktop:build   # 설치 파일 → src-tauri/target/release/bundle/nsis/
+```
+
+- 설치 파일에는 뇌 데이터·VRM이 들어 있지 않고, 첫 실행 때 GitHub Releases(`data-v783`)에서 한 번 받아 둡니다.
+- 닫기(✕)는 트레이로 숨기기이고, 트레이 메뉴에서 항상 위·컴퓨터 켜면 같이 시작·종료를 고릅니다. 숨겨 둔 동안은 뇌 시뮬을 멈추고, 다시 열면 지난 시간만큼 배고픔 등이 반영됩니다.
 
 ## 동작 원리
 
@@ -139,4 +151,4 @@ Shiu et al. 2024 (Nature) Brian2 모델과 같은 방정식과 파라미터를 �
 
 - FlyWire 커넥톰 v783: Dorkenwald et al. 2024, Schlegel et al. 2024 (Nature). 연결 행렬은 [philshiu/Drosophila_brain_model](https://github.com/philshiu/Drosophila_brain_model), 주석·좌표는 [flyconnectome/flywire_annotations](https://github.com/flyconnectome/flywire_annotations)에서 받습니다.
 - LIF 모델: Shiu et al. 2024, *A Drosophila computational brain model reveals sensorimotor processing*, Nature.
-- 캐릭터: pixiv `VRM1_Constraint_Twist_Sample` (VRM Public License 1.0. 누구나 사용, 상업 이용, 수정·재배포 허용, 표기 불필요). `public/models/onna.vrm`을 다른 VRM으로 바꿔도 동작하며, 불러오지 못하면 도형 인형으로 대체합니다.
+- 캐릭터: pixiv `VRM1_Constraint_Twist_Sample` (VRM Public License 1.0. 누구나 사용, 상업 이용, 수정·재배포 허용, 표기 불필요). `public/models/fly-chan.vrm`을 다른 VRM으로 바꿔도 동작하며, 불러오지 못하면 도형 인형으로 대체합니다.

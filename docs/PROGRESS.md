@@ -57,12 +57,19 @@
 - **세기 제한:** 물 GRN은 100 Hz에서 무반응이라 200 Hz, Ir94e는 200 Hz에서 폭주라 100 Hz.
 - **논문 노트북의 당·쓴맛 ID는 옛 버전(v630)이라 지금 데이터(v783)에 없습니다.** 물·Ir94e ID만 v783에 그대로 있어 18개씩 대조해 씁니다.
 
-## 데스크톱 앱 구상 (아직 구현 안 함)
+## 데스크톱 앱 (Tauri, 2026-09-17 착수)
+
+- **구현됨:** `src-tauri/`(작은 테두리 없는 창·오른쪽 아래 배치·트레이 메뉴[보이기/항상 위/자동 시작/종료]·닫기=트레이·두 번 실행 방지), `src/desktop.ts`(제목 줄: 📌 항상 위, 작게, 숨기기), `src/util/assets.ts`(첫 실행 때 Releases 에서 받아 Cache Storage), 창 숨김 동안 시뮬 정지 + 복귀 때 `Care.resume` 으로 경과 시간 반영(웹 탭에도 적용), 데스크톱에서 질투 끔.
+- **실행:** `npm run desktop`(개발, Vite 의 public/ 데이터 사용) / `npm run desktop:build`(설치 파일, `src-tauri/target/release/bundle/nsis/`).
+- **배포 전에 할 일:** Releases 에 `data-v783` 태그로 `public/data/*` 8개 + `public/models/fly-chan.vrm` 올리기 (`gh release create data-v783 public/data/* public/models/fly-chan.vrm`). 파일 이름은 `ASSET_FILES` 의 마지막 부분과 같아야 한다.
+- 이름 변경(ONNA → 플라이쨩/fly-chan): 예전 저장 키 `onna-care-v2`·IndexedDB `onna-files`는 이어받는다.
+
+### 처음 구상 메모
 
 - **Tauri 추천** (설치 5~10 MB, OS 웹뷰 사용). Electron은 150 MB 이상이라 상주 앱에는 부담.
 - 360×640 작은 창, 프레임 없음, 항상 위, 드래그 이동, 트레이 상주, 자동 시작 옵션.
 - 창을 숨기면 뇌 시뮬을 멈추고 돌아올 때 경과 시간만 반영(오프라인 계산은 이미 있음).
-- **결정 (2026-09-17): Tauri + 뇌 데이터는 첫 실행 때 GitHub Releases에서 받기.** VRM(`public/models/onna.vrm`, 10 MB, git 제외)도 Releases에 함께 올린다. 올리기 전에 확인받기.
+- **결정 (2026-09-17): Tauri + 뇌 데이터는 첫 실행 때 GitHub Releases에서 받기.** VRM(`public/models/fly-chan.vrm`, 10 MB, git 제외)도 Releases에 함께 올린다. 올리기 전에 확인받기.
   - 먼저 Rust 설치: `winget install --id Rustlang.Rustup -e --interactive` (`--silent`는 실패했음). VS 2022 C++ 도구·WebView2 필요.
   - tauri-plugin-http로 받아 Cache Storage에 저장하고, 워커·main의 `data/` 요청을 캐시 우선으로. Tauri 빌드 결과물에서 `public/data`는 뺀다.
   - 닫기 = 트레이로 숨김, 두 번 실행 방지. 데스크톱에서는 질투 이벤트(창 숨김 30분)를 끄고, 숨긴 동안 흐른 시간을 복귀 때 반영(지금은 창이 숨겨지면 게임 시간이 멈춤).

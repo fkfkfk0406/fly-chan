@@ -3,6 +3,7 @@ import {
   CONNECTOME_FILES, MOTOR_GROUPS, parseConnectome, type Groups, type Meta, type MotorGroup,
 } from "./data.ts";
 import type { FromWorker, ToWorker } from "./protocol.ts";
+import { fetchAsset } from "../util/assets.ts";
 
 const FRAME_MS = 33; // 스냅샷 주기
 const BUDGET_MS = 22; // 프레임당 계산 예산
@@ -35,7 +36,7 @@ let probeSeen: number[] = [];
 let probeTimes: number[][] = [];
 
 async function fetchBuffer(name: string, loaded: { bytes: number; total: number }): Promise<ArrayBuffer> {
-  const res = await fetch(`${import.meta.env.BASE_URL}data/${name}`);
+  const res = await fetchAsset(`data/${name}`);
   if (!res.ok || !res.body) throw new Error(`${name} 을 불러오지 못했습니다 (${res.status}). npm run data 를 먼저 실행하세요.`);
   const reader = res.body.getReader();
   const size = Number(res.headers.get("content-length")) || 0;
@@ -60,11 +61,10 @@ async function fetchBuffer(name: string, loaded: { bytes: number; total: number 
 }
 
 async function init(dt: number, adaptation: Adaptation) {
-  const base = `${import.meta.env.BASE_URL}data/`;
   const [meta, groupJson, labelJson] = await Promise.all([
-    fetch(`${base}meta.json`).then((r) => r.json() as Promise<Meta>),
-    fetch(`${base}groups.json`).then((r) => r.json() as Promise<Groups>),
-    fetch(`${base}labels.json`).then((r) => r.json() as Promise<Record<string, string>>),
+    fetchAsset("data/meta.json").then((r) => r.json() as Promise<Meta>),
+    fetchAsset("data/groups.json").then((r) => r.json() as Promise<Groups>),
+    fetchAsset("data/labels.json").then((r) => r.json() as Promise<Record<string, string>>),
   ]);
   groups = groupJson;
   labels = Object.entries(labelJson).map(([i, name]) => [Number(i), name]);

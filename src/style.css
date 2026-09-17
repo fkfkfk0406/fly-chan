@@ -424,3 +424,17 @@ body.flash::after {
 }
 .letter p { margin: 0 0 6px; }
 .letter button { display: block; margin: 12px auto 0; padding: 8px 18px; border-radius: 99px; border: 0; background: var(--accent); color: #fff; font-weight: 700; }
+
+/* 데스크톱 앱(Tauri): 테두리 없는 창의 제목 줄 */
+body.desktop { --safe-top: 28px; }
+.titlebar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 40; height: 28px;
+  display: flex; align-items: center; gap: 2px; padding: 0 4px 0 12px;
+  background: rgba(255, 250, 251, 0.85); border-bottom: 1px solid var(--line);
+  font-size: 11px; font-weight: 700; letter-spacing: 0.12em; color: var(--muted);
+  -webkit-user-select: none; user-select: none;
+}
+.titlebar span { flex: 1; }
+.titlebar button { width: 30px; height: 22px; border: 0; border-radius: 6px; background: transparent; font-size: 12px; color: var(--muted); }
+.titlebar button:hover { background: var(--accent-soft); color: var(--accent); }
+.titlebar button:not(.on)[aria-label="항상 위"] { opacity: 0.4; }

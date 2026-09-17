@@ -1,5 +1,5 @@
 {
-  "name": "onna",
+  "name": "fly-chan",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -8,13 +8,19 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
-    "probe": "node scripts/probe.ts"
+    "probe": "node scripts/probe.ts",
+    "tauri": "tauri",
+    "desktop": "tauri dev",
+    "desktop:build": "tauri build"
   },
   "dependencies": {
     "@pixiv/three-vrm": "^3.5.5",
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-http": "^2.6.1",
     "three": "^0.186.0"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4",
     "@types/node": "^26.5.1",
     "@types/three": "^0.186.0",
     "typescript": "^7.0.2",

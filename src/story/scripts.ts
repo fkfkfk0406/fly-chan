@@ -1,4 +1,4 @@
-// 온나의 대본. 대사는 미리 쓴 것이고, "오늘 뭐 했어?"만 실제 뇌 출력 기록(오늘의 MN9·그루밍 DN 발화 시간)을 읽는다.
+// 플라이쨩의 대본. 대사는 미리 쓴 것이고, "오늘 뭐 했어?"만 실제 뇌 출력 기록(오늘의 MN9·그루밍 DN 발화 시간)을 읽는다.
 import type { TodayStats } from "../care/Care.ts";
 
 export type Expr = "happy" | "sad" | "surprised" | "relaxed" | "angry" | "neutral";

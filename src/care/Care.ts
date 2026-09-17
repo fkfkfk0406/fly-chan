@@ -178,8 +178,10 @@ export interface CareState {
 }
 
 // 난이도를 바꾸면서 저장 형식이 달라져 새로 시작한다
-const KEY = "onna-care-v2";
+const KEY = "fly-chan-care-v2";
 const OLD_KEYS = ["onna-care-v1"];
+/** 이름을 onna 에서 fly-chan 으로 바꾸기 전의 저장 키. 있으면 그대로 이어받는다 */
+const RENAMED_KEY = "onna-care-v2";
 const HOUR = 3600;
 const OFFLINE_CAP_H = 72;
 const DIARY_MAX = 60;
@@ -250,6 +252,9 @@ export class Care {
     let saved: CareState | null = null;
     try {
       for (const k of OLD_KEYS) localStorage.removeItem(k);
+      const renamed = localStorage.getItem(RENAMED_KEY);
+      if (renamed && !localStorage.getItem(KEY)) localStorage.setItem(KEY, renamed);
+      localStorage.removeItem(RENAMED_KEY);
       const raw = localStorage.getItem(KEY);
       if (raw) saved = { ...Care.fresh(now), ...JSON.parse(raw) };
     } catch {
@@ -258,6 +263,13 @@ export class Care {
     const care = new Care(saved ?? Care.fresh(now), timeScale);
     if (saved) care.catchUp(now);
     return care;
+  }
+
+  /** 창이 숨겨져 있던 시간을 흘려보낸다. 1분 넘게 지났으면 true */
+  resume(now: number): boolean {
+    if (now - this.s.lastSeen < 60_000) return false;
+    this.catchUp(now);
+    return true;
   }
 
   private catchUp(now: number): void {

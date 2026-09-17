@@ -1,5 +1,5 @@
 // 대사 속 {name}(캐릭터 이름)·{me}(나를 부르는 호칭)을 채운다.
-// 조사는 받침에 맞춰 고른다: {me:을/를} → "민준을" / "너를", {name:이/가} → "온나가"
+// 조사는 받침에 맞춰 고른다: {me:을/를} → "민준을" / "너를", {name:이/가} → "플라이쨩이"
 
 export interface Names {
   name: string;
@@ -20,7 +20,7 @@ export function personalize(text: string, names: Names): string {
   });
 }
 
-export const DEFAULT_NAMES: Names = { name: "온나", me: "너" };
+export const DEFAULT_NAMES: Names = { name: "플라이쨩", me: "너" };
 
 /** 입력값 정리: 앞뒤 공백·줄바꿈 제거, 8자 제한, 비면 기본값 */
 export function cleanName(input: string, fallback: string): string {

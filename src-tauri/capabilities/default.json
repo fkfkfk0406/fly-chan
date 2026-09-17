@@ -1,0 +1,20 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "플라이쨩 메인 창: 제목 줄 조작, 뇌 데이터 받기(GitHub Releases)",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-minimize",
+    "core:window:allow-hide",
+    "core:window:allow-set-always-on-top",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://github.com/fkfkfk0406/fly-chan/releases/download/*" },
+        { "url": "https://*.githubusercontent.com/*" }
+      ]
+    }
+  ]
+}

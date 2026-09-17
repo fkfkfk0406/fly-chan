@@ -1,5 +1,5 @@
 // 효과음. 음원 파일 없이 WebAudio 로 짧게 합성한다.
-const MUTE_KEY = "onna-muted";
+const MUTE_KEY = "fly-chan-muted";
 
 type Wave = OscillatorType;
 
@@ -11,7 +11,7 @@ export class Sfx {
   constructor() {
     let muted = false;
     try {
-      muted = localStorage.getItem(MUTE_KEY) === "1";
+      muted = (localStorage.getItem(MUTE_KEY) ?? localStorage.getItem("onna-muted")) === "1";
     } catch {
       // 저장소를 못 쓰면 기본값
     }
