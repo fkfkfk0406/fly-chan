@@ -297,7 +297,13 @@ body.talking .dock, body.talking .status, body.talking .bubble { display: none; 
 .fine { margin: 0; font-size: 11px; color: var(--dark-muted); line-height: 1.5; }
 
 /* 상점 */
-.hearts { width: auto; padding: 0 12px; gap: 5px; display: flex; align-items: center; font-size: 15px; }
+.hearts { padding: 0 4px 0 8px; gap: 5px; display: flex; align-items: center; font-size: 15px; }
+.shop-btn {
+  display: flex; align-items: center; gap: 4px; height: 44px; padding: 0 14px 0 11px; border-radius: 99px;
+  background: var(--card); backdrop-filter: blur(8px); font-size: 13px; font-weight: 700; color: var(--accent);
+}
+.shop-btn span { font-size: 18px; }
+.hud-buttons > * { flex-shrink: 0; white-space: nowrap; }
 .hearts b { font-variant-numeric: tabular-nums; }
 .drawer.shop { left: 0; background: #fffafb; border-right: 1px solid var(--line); --slide: -40px; }
 .drawer-head h2 small { font-weight: 400; color: var(--muted); font-size: 12px; margin-left: 6px; }
@@ -377,12 +383,14 @@ body.flash::after {
   .gauges .label { display: none; }
   .bar { width: 28px; }
   .round { width: 40px; height: 40px; }
+  .shop-btn { height: 40px; padding: 0 11px 0 9px; }
+  .hud-buttons { gap: 6px; }
   .dock { gap: 2px; padding: 6px; }
   .dock > button, .prank > button { min-width: 46px; padding: 6px 2px; font-size: 11px; }
   .dock span { font-size: 20px; }
   .dialog-text { font-size: 15px; }
   .drawer { top: auto; height: 78vh; width: 100vw; border-radius: 20px 20px 0 0; --slide: 0; animation-name: rise; }
-  .drawer.diary, .drawer.brain { left: 0; right: 0; border: 0; }
+  .drawer.diary, .drawer.brain, .drawer.shop, .drawer.album { left: 0; right: 0; border: 0; }
   .viewport { height: 220px; }
   @keyframes rise { from { transform: translateY(40px); opacity: 0; } }
 }
