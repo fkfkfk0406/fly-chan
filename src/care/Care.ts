@@ -132,6 +132,8 @@ export interface CareState {
   /** 지금까지 쌓인 기록과 달성한 업적 */
   totals: Totals;
   unlocked: string[];
+  /** 외형: 기본 미소녀 VRM, 진짜 초파리, 사용자가 불러온 VRM */
+  avatar: "girl" | "fly" | "custom";
   /** 마지막으로 찍은 사진 (액자에 걸린다) */
   photo: string;
   /** 하트: 상점 재화 */
@@ -211,7 +213,7 @@ export class Care {
       name: "", callMe: "", introDone: false,
       stageSeen: 0, gameHours: 0, gainDay: 0, gainToday: 0,
       totals: { meals: 0, pets: 0, cleans: 0, talks: 0, sleeps: 0, scares: 0, grooms: 0, photos: 0 },
-      unlocked: [], photo: "",
+      unlocked: [], photo: "", avatar: "girl",
       hearts: 20, pendingHearts: 0, stock: { sweet: 3, honey: 0, water: 2, salty: 0, bitter: 1 },
       owned: [], giftDay: -1, heartsToday: 0,
       greetedDay: "", today: emptyToday(now), recentTalks: [], tastes: {},

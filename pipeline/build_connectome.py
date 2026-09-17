@@ -115,6 +115,11 @@ def build_groups(ann: pd.DataFrame, index_of: dict) -> dict:
         "jo_song": pick(sub == "auditory"),
         # 내부 상태: pC1a~e (각성·짝짓기 상태를 정하는 뉴런, 암컷에서는 수용성·공격성) — scripts/pc1-probe.ts
         "pc1": pick(ct.str.match(r"^pC1[a-e]$")),
+        # 생체시계 뉴런 (neurofly-kit populations.py 참고) — scripts/clock-probe.ts
+        # 실제 초파리: LNv(PDF) 는 각성·아침, DN1p 는 새벽·저녁 수면 조절, LNd 는 저녁 활동
+        "clock_lnv": pick(ct.str.match(r"^(l-LNv|s-LNv)")),
+        "clock_lnd": pick(ct.str.match(r"^LNd")),
+        "clock_dn1": pick(ct.str.match(r"^DN1")),
         # 운동 출력
         "forward": pick(ct == "DNp09"),  # P9
         "backward": pick(ct == "MDN"),  # moonwalker

@@ -1,7 +1,9 @@
 import "./style.css";
 import { BEHAVIOR_LABEL, Controller } from "./behavior/Controller.ts";
 import { BodyScene } from "./body/BodyScene.ts";
+import { FlyAvatar } from "./body/FlyAvatar.ts";
 import { createFallbackRig, loadVrmRig } from "./body/Rig.ts";
+import { getBlob, putBlob } from "./util/blobStore.ts";
 import { NeuralField } from "./brain/NeuralField.ts";
 import { Raster } from "./brain/Raster.ts";
 import {
@@ -185,16 +187,57 @@ director.onStageUp = (stage) => {
 body.onPet = () => pet();
 body.onCleanMess = (id) => cleanUp(id);
 
-loadVrmRig(`${BASE}models/onna.vrm`)
-  .catch((err) => {
-    console.warn("VRM 로드 실패, 도형 인형으로 대체합니다:", err);
-    return createFallbackRig();
-  })
-  .then((rig) => {
-    body.setRig(rig);
+// ---------------------------------------------------------------- 외형
+type AvatarKind = "girl" | "fly" | "custom";
+let avatarLoading = false;
+
+async function applyAvatar(kind: AvatarKind): Promise<boolean> {
+  if (avatarLoading) return false;
+  avatarLoading = true;
+  try {
+    if (body.hasAvatar(kind)) body.useAvatar(kind);
+    else if (kind === "fly") body.setRig(new FlyAvatar(), "fly");
+    else if (kind === "custom") {
+      const blob = await getBlob("custom-vrm");
+      if (!blob) throw new Error("저장된 VRM 이 없어요");
+      const url = URL.createObjectURL(blob);
+      body.setRig(await loadVrmRig(url), "custom");
+      URL.revokeObjectURL(url);
+    } else {
+      const rig = await loadVrmRig(`${BASE}models/onna.vrm`).catch((err) => {
+        console.warn("VRM 로드 실패, 도형 인형으로 대체합니다:", err);
+        return createFallbackRig();
+      });
+      body.setRig(rig, "girl");
+    }
+    care.s.avatar = kind;
     body.setCosmetics(care.s.owned); // 산 꾸미기 아이템 복원
     if (care.s.photo) body.setPhoto(care.s.photo);
-  });
+    return true;
+  } catch (err) {
+    console.warn("외형을 바꾸지 못했어요:", err);
+    say("그 모습은 불러올 수 없어…");
+    return false;
+  } finally {
+    avatarLoading = false;
+  }
+}
+
+void applyAvatar(care.s.avatar).then((ok) => {
+  if (!ok) void applyAvatar("girl");
+});
+
+$<HTMLInputElement>("vrm-file").addEventListener("change", async (e) => {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  await putBlob("custom-vrm", file);
+  body.forgetAvatar("custom");
+  if (await applyAvatar("custom")) {
+    care.log(Date.now(), `새 모습(${file.name})으로 바꿨어요.`);
+    sfx.sparkle();
+  }
+  renderShop();
+});
 
 // ---------------------------------------------------------------- 뇌 패널 요소
 const meterEls = new Map<MotorGroup, { row: HTMLElement; fill: HTMLElement; val: HTMLElement }>();
@@ -648,6 +691,23 @@ function renderShop() {
           burst(at.x, at.y, 5, ["✨"]);
         }
       });
+    }),
+  );
+
+  const avatars: [AvatarKind, string, string, string][] = [
+    ["girl", "🧑", "미소녀", "기본 VRM 모습"],
+    ["fly", "🪰", "진짜 초파리", "다리 6개로 걷고 앞다리로 그루밍해요"],
+    ["custom", "📁", "내 VRM 불러오기", "가진 VRM 파일로 모습 바꾸기"],
+  ];
+  $("shop-avatar").replaceChildren(
+    ...avatars.map(([kind, emoji, name, note]) => {
+      const current = s.avatar === kind;
+      const item = shopItem(emoji, name, note, null, false, () => {
+        if (kind === "custom") $<HTMLInputElement>("vrm-file").click();
+        else void applyAvatar(kind).then(() => renderShop());
+      });
+      item.querySelector(".price")!.textContent = current ? "사용 중" : kind === "custom" ? "파일 선택" : "바꾸기";
+      return item;
     }),
   );
 

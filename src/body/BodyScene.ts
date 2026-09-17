@@ -5,9 +5,18 @@ import type { Mess } from "../care/Care.ts";
 import type { Expr } from "../story/scripts.ts";
 import { BED, CAMERA_HOME, ROOM_HALF, type Food } from "../world/Habitat.ts";
 import { Animator } from "./Animator.ts";
+import { FlyAvatar } from "./FlyAvatar.ts";
 import type { Rig } from "./Rig.ts";
 
 const WALL_H = 2.6;
+
+/** 사람 모양(Animator)과 초파리(FlyAvatar)가 공통으로 가진 부분 */
+interface AvatarAnimator {
+  readonly poseRoot: THREE.Object3D;
+  update(dt: number, state: BodyState, mood?: number): void;
+  exprOverride: Expr | undefined;
+  talking: boolean;
+}
 const DAY = { bg: 0xf4ede6, hemi: 1.5, sun: 1.7, lamp: 0.0, sky: 0xbfe3f5 };
 const NIGHT = { bg: 0x1c1b2e, hemi: 0.22, sun: 0.0, lamp: 2.2, sky: 0x1f2a4d };
 
@@ -34,8 +43,11 @@ export class BodyScene {
   private lampShade!: THREE.MeshStandardMaterial;
   private wallMat!: THREE.MeshStandardMaterial;
   private daylight = 1;
-  private animator?: Animator;
+  private animator?: AvatarAnimator;
   private rig?: Rig;
+  /** 외형별로 한 번만 만든다 (애니메이터·몸에 붙은 꾸미기) */
+  private readonly avatars = new Map<string, { rig: Rig; animator: AvatarAnimator; body: Map<string, THREE.Object3D> }>();
+  private roomCosmeticsBuilt = false;
   private readonly cosmetics = new Map<string, THREE.Object3D>();
   private ownedCosmetics: string[] = [];
   private framePicture?: THREE.Mesh;
@@ -176,14 +188,38 @@ export class BodyScene {
     box(0.22, 0.16, 0.16, mat(0xf2d27a), 2.2, 1.46, -ROOM_HALF + 0.14);
   }
 
-  setRig(rig: Rig): void {
-    this.rig = rig;
-    // 꾸미기는 캐릭터를 방에 놓기 전에 만든다 (그래야 모델 좌표 그대로 붙는다)
-    this.buildCosmetics(rig);
-    this.animator = new Animator(rig);
-    this.character.add(this.animator.poseRoot);
-    rig.object.traverse((o) => (o.castShadow = true));
+  hasAvatar(key: string): boolean {
+    return this.avatars.has(key);
+  }
+
+  /** 만들어 둔 외형으로 바꾼다 */
+  useAvatar(key: string): void {
+    const av = this.avatars.get(key);
+    if (av) this.setRig(av.rig, key);
+  }
+
+  /** 외형을 바꾼다. 같은 key 로 다시 부르면 만들어 둔 것을 재사용한다 */
+  setRig(rig: Rig, key = "girl"): void {
+    let av = this.avatars.get(key);
+    if (!av) {
+      // 꾸미기는 캐릭터를 방에 놓기 전에 만든다 (그래야 모델 좌표 그대로 붙는다)
+      const body = this.buildBodyCosmetics(rig);
+      const animator = rig instanceof FlyAvatar ? rig : new Animator(rig);
+      rig.object.traverse((o) => (o.castShadow = true));
+      av = { rig, animator, body };
+      this.avatars.set(key, av);
+    }
+    if (this.animator) this.character.remove(this.animator.poseRoot);
+    this.rig = av.rig;
+    this.animator = av.animator;
+    this.character.add(av.animator.poseRoot);
+    this.buildRoomCosmetics();
     this.setCosmetics(this.ownedCosmetics);
+  }
+
+  /** 불러온 사용자 VRM 을 지운다 (다른 파일로 바꿀 때) */
+  forgetAvatar(key: string): void {
+    this.avatars.delete(key);
   }
 
   /** 지금 화면을 PNG 데이터 URL 로 (렌더 직후 같은 틱에서 읽어야 비어 있지 않다) */
@@ -212,10 +248,12 @@ export class BodyScene {
   setCosmetics(owned: readonly string[]): void {
     this.ownedCosmetics = [...owned];
     for (const [id, obj] of this.cosmetics) obj.visible = owned.includes(id);
+    for (const av of this.avatars.values()) for (const [id, obj] of av.body) obj.visible = owned.includes(id);
   }
 
-  /** 리본·목도리는 캐릭터에, 화분·액자는 방에 붙인다 */
-  private buildCosmetics(rig: Rig): void {
+  /** 리본·목도리: 캐릭터 몸에 붙인다 (외형마다) */
+  private buildBodyCosmetics(rig: Rig): Map<string, THREE.Object3D> {
+    const items = new Map<string, THREE.Object3D>();
     const toon = (c: number) => new THREE.MeshToonMaterial({ color: c });
     rig.object.updateMatrixWorld(true);
     const head = rig.attachNode("head");
@@ -234,7 +272,7 @@ export class BodyScene {
     }
     ribbon.add(new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), toon(0xc93459)));
     this.attachTo(ribbon, head, new THREE.Vector3(0.07, top - (top - headPos.y) * 0.25, headPos.z + 0.02));
-    this.cosmetics.set("ribbon", ribbon);
+    items.set("ribbon", ribbon);
 
     // 🧣 목도리: 목 아래
     const scarf = new THREE.Group();
@@ -246,7 +284,15 @@ export class BodyScene {
     scarf.add(band, tail);
     const chestPos = chest?.getWorldPosition(new THREE.Vector3()) ?? new THREE.Vector3(0, rig.height * 0.72, 0);
     this.attachTo(scarf, chest, new THREE.Vector3(0, chestPos.y + 0.12, chestPos.z));
-    this.cosmetics.set("scarf", scarf);
+    items.set("scarf", scarf);
+    return items;
+  }
+
+  /** 화분·액자: 방에 한 번만 붙인다 */
+  private buildRoomCosmetics(): void {
+    if (this.roomCosmeticsBuilt) return;
+    this.roomCosmeticsBuilt = true;
+    const toon = (c: number) => new THREE.MeshToonMaterial({ color: c });
 
     // 🪴 화분: 창가
     const plant = new THREE.Group();
