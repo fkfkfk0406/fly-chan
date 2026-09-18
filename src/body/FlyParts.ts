@@ -50,10 +50,9 @@ export class FlyParts {
       iridescence: 1, iridescenceIOR: 1.35, side: THREE.DoubleSide, depthWrite: false,
     });
     const veinMat = new THREE.LineBasicMaterial({ color: 0x8c7aa8, transparent: true, opacity: 0.55 });
-    const veins = new THREE.BufferGeometry().setFromPoints([
-      [0, 0, 0.55, 0.05], [0, 0, 0.45, -0.07], [0.1, 0.02, 0.5, 0.1], [0.2, -0.02, 0.35, -0.08], [0.3, 0.06, 0.32, -0.08],
-    ].flatMap(([x1, y1, x2, y2]) => [new THREE.Vector3(x1, y1, 0.001), new THREE.Vector3(x2, y2, 0.001)]));
-    const outline = new THREE.BufferGeometry().setFromPoints(shape.getPoints(40).map((p) => new THREE.Vector3(p.x, p.y, 0.001)));
+    const edge = shape.getPoints(80);
+    const outline = new THREE.BufferGeometry().setFromPoints(edge.map((p) => new THREE.Vector3(p.x, p.y, 0.001)));
+    const veins = new THREE.BufferGeometry().setFromPoints(wingVeins(edge).map((p) => new THREE.Vector3(p.x, p.y, 0.001)));
 
     const wingScale = rig.height / 1.45;
     for (const s of [1, -1]) {
@@ -99,4 +98,33 @@ export class FlyParts {
       a.quaternion.copy(a.userData.rest).multiply(q.setFromEuler(e));
     });
   }
+}
+
+/**
+ * 초파리 날개맥: 뿌리에서 퍼지는 세로맥 L2~L5 와 가로맥 두 개.
+ * 끝을 날개 테두리 위의 점에서 조금 안쪽으로 잡아서, 맥이 날개막 밖으로 삐져나오지 않는다.
+ * 선분 목록(LineSegments 용 점 쌍)을 돌려준다.
+ */
+function wingVeins(edge: THREE.Vector2[]): THREE.Vector2[] {
+  const root = new THREE.Vector2(0.03, 0);
+  // 테두리에서 x 가 target 에 가장 가까운 점 (위쪽/아래쪽 가장자리 구분)
+  const onEdge = (x: number, upper: boolean) =>
+    edge.filter((p) => (upper ? p.y >= 0 : p.y <= 0)).reduce((best, p) => (Math.abs(p.x - x) < Math.abs(best.x - x) ? p : best));
+  const tip = edge.reduce((best, p) => (p.x > best.x ? p : best));
+  const ends = [onEdge(0.4, true), tip, onEdge(0.47, false), onEdge(0.28, false)];
+  const curves = ends.map((end, k) => {
+    const inside = root.clone().lerp(end, 0.97);
+    // 살짝 휘게: 중간점을 날개 가운데 쪽으로
+    const mid = root.clone().lerp(inside, 0.5).add(new THREE.Vector2(0, [0.012, 0.004, -0.004, -0.01][k]));
+    return new THREE.QuadraticBezierCurve(root, mid, inside);
+  });
+  const out: THREE.Vector2[] = [];
+  for (const c of curves) {
+    const pts = c.getPoints(12);
+    for (let i = 0; i < pts.length - 1; i++) out.push(pts[i], pts[i + 1]);
+  }
+  // 가로맥: L3–L4 (앞), L4–L5 (뒤)
+  out.push(curves[1].getPoint(0.45), curves[2].getPoint(0.45));
+  out.push(curves[2].getPoint(0.68), curves[3].getPoint(0.8));
+  return out;
 }
