@@ -4,6 +4,8 @@
 
 **초파리의 뇌를 가진 소녀를 키우는 3D 다마고치.**
 
+> **▶ 바로 해보기: https://fkfkfk0406.github.io/fly-chan/** (설치 없이 브라우저에서. 처음 열 때 뇌 데이터 약 100 MB를 받아요)
+>
 > 게임은 한국어와 영어를 지원해요. 첫 화면이나 일기 맨 아래에서 언어를 고를 수 있어요.
 
 진짜 초파리 전뇌 커넥톰(FlyWire v783, 뉴런 138,639개)을 브라우저에서 LIF 모델로 실시간 시뮬레이션합니다. 방 안의 플라이쨩이 딸기를 먹을지, 깜짝 놀라 뛰어오를지, 더듬이를 손질할지는 대본이 아니라 그 뇌의 하강·운동 뉴런이 정합니다.
@@ -50,6 +52,8 @@
 
 ### 웹
 
+설치 없이 해보려면 [웹버전](https://fkfkfk0406.github.io/fly-chan/)을 열면 됩니다. 직접 실행하려면:
+
 ```bash
 npm install
 python -m venv pipeline/.venv
@@ -80,7 +84,7 @@ npm run desktop:build   # 설치 파일 → src-tauri/target/release/bundle/nsis
 npm run release   # package.json 버전을 올려 커밋·태그(v0.1.1 …)를 만들고 푸시
 ```
 
-태그가 올라가면 GitHub Actions(`.github/workflows/release.yml`)가 설치 파일을 빌드·서명해서 Releases에 올리고, 앱이 읽는 `latest.json`도 함께 올립니다.
+태그가 올라가면 GitHub Actions(`.github/workflows/release.yml`)가 설치 파일을 빌드·서명해서 Releases에 올리고, 앱이 읽는 `latest.json`도 함께 올립니다. 같은 태그로 `.github/workflows/pages.yml`이 웹버전을 GitHub Pages에 다시 올립니다(뇌 데이터·VRM은 `RELEASE_TAG` 릴리스에서 받아 함께 올림).
 - 서명 키: 개인 키는 저장소 Secret `TAURI_SIGNING_PRIVATE_KEY`, 공개 키는 `src-tauri/tauri.conf.json`에 있습니다. 개인 키를 잃어버리면 이미 설치된 앱에 업데이트를 보낼 수 없습니다.
 - 뇌 데이터를 바꿀 때는 새 태그(예: `data-v784`)로 **사전 릴리스(prerelease)** 로 올리고 `src/util/assets.ts`의 `RELEASE_TAG`를 바꿉니다. 앱이 새 데이터를 받고 예전 것은 지웁니다. 사전 릴리스로 올려야 앱 업데이트 확인(`releases/latest`)을 가로채지 않습니다.
 

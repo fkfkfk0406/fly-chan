@@ -7,6 +7,8 @@ import { defineConfig } from "vite";
 const desktop = !!process.env.TAURI_ENV_PLATFORM;
 
 export default defineConfig({
+  // GitHub Pages 는 /fly-chan/ 아래에서 열린다 (.github/workflows/pages.yml)
+  base: process.env.PAGES_BASE ?? "/",
   clearScreen: false,
   server: { strictPort: true },
   worker: { format: "es" },

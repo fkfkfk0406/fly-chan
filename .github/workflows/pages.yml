@@ -1,0 +1,56 @@
+# 웹버전: v 태그를 푸시하면(npm run release) GitHub Pages 에 올린다.
+# 뇌 데이터·VRM 은 git 에 없으니 src/util/assets.ts 의 RELEASE_TAG 릴리스에서 받아 함께 올린다.
+name: pages
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: 뇌 데이터·VRM 받기
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(grep -oP 'RELEASE_TAG = "\K[^"]+' src/util/assets.ts)
+          gh release download "$tag" -D public/data -p '*.json' -p '*.f32' -p '*.u8' -p '*.u32' -p '*.i16'
+          gh release download "$tag" -D public/models -p 'fly-chan.vrm'
+
+      - run: npm run build
+        env:
+          PAGES_BASE: /${{ github.event.repository.name }}/
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

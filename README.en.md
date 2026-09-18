@@ -6,6 +6,8 @@
 
 Fly-chan runs the full adult fruit fly brain connectome (FlyWire v783, 138,639 neurons) as a leaky integrate-and-fire (LIF) network in your browser, in real time. Whether she eats the strawberry, jumps away in fright, or grooms her antennae is decided by the descending and motor neurons of that simulated brain, not by a script.
 
+> **▶ Play now: https://fkfkfk0406.github.io/fly-chan/** (in your browser, no install. The first visit downloads about 100 MB of brain data.)
+>
 > The game is available in English and Korean. Pick a language on the first screen or at the bottom of the diary.
 
 ![Room](docs/images/room.jpg)
@@ -50,6 +52,8 @@ Food preferences are not scripted either: the peak MN9 firing rate while eating 
 
 ### Web
 
+To just play, open the [web version](https://fkfkfk0406.github.io/fly-chan/). To run it yourself:
+
 ```bash
 npm install
 python -m venv pipeline/.venv
@@ -82,7 +86,7 @@ npm run desktop:build   # installer → src-tauri/target/release/bundle/nsis/
 npm run release   # bumps package.json, commits, tags (v0.1.1 …) and pushes
 ```
 
-Pushing the tag triggers GitHub Actions (`.github/workflows/release.yml`), which builds and signs the installer, uploads it to Releases, and publishes the `latest.json` read by the updater.
+Pushing the tag triggers GitHub Actions (`.github/workflows/release.yml`), which builds and signs the installer, uploads it to Releases, and publishes the `latest.json` read by the updater. The same tag triggers `.github/workflows/pages.yml`, which redeploys the web version to GitHub Pages (the brain data and VRM are pulled from the `RELEASE_TAG` release).
 - Signing key: the private key is the repository secret `TAURI_SIGNING_PRIVATE_KEY`; the public key is in `src-tauri/tauri.conf.json`. If the private key is lost, installed apps can no longer receive updates.
 - To change the brain data, upload it under a new tag (e.g. `data-v784`) as a **prerelease** and update `RELEASE_TAG` in `src/util/assets.ts`. Prereleases keep the updater's `releases/latest` lookup pointing at app releases.
 
