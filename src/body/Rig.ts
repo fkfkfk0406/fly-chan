@@ -43,6 +43,10 @@ export interface Rig {
   update(dt: number): void;
 }
 
+/** 이 범위를 벗어난 VRM 은 범위 안으로 크기를 맞춘다 (m). 기본 모델은 약 1.6 */
+const MIN_HEIGHT = 1.1;
+const MAX_HEIGHT = 1.9;
+
 export async function loadVrmRig(url: string, onProgress?: (ratio: number) => void): Promise<Rig> {
   const loader = new GLTFLoader();
   loader.register((parser) => new VRMLoaderPlugin(parser));
@@ -62,6 +66,15 @@ export async function loadVrmRig(url: string, onProgress?: (ratio: number) => vo
 
   vrm.scene.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(vrm.scene);
+  // 사용자가 불러온 VRM 중에는 단위가 어긋나 수 m·수 cm 인 것도 있다. 방·카메라에 맞게 사람 키로 줄이거나 늘린다
+  const rawHeight = box.max.y - box.min.y;
+  const fit = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, rawHeight)) / rawHeight;
+  if (rawHeight > 0 && fit !== 1) {
+    vrm.scene.scale.multiplyScalar(fit);
+    vrm.scene.updateMatrixWorld(true);
+    box.setFromObject(vrm.scene);
+    vrm.springBoneManager?.setInitState(); // 머리카락·옷 흔들림을 바뀐 크기로 다시 잡는다
+  }
   const hips = vrm.humanoid.getNormalizedBoneNode("hips")!;
   const hipsHeight = hips.getWorldPosition(new THREE.Vector3()).y - box.min.y;
 

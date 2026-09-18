@@ -7,6 +7,7 @@ import { createFallbackRig, loadVrmRig } from "./body/Rig.ts";
 import { delBlob, getBlob, putBlob } from "./util/blobStore.ts";
 import { IS_DESKTOP, assetUrl, ensureAssets, fetchAsset } from "./util/assets.ts";
 import { setupDesktop } from "./desktop.ts";
+import { claimTab } from "./util/singleTab.ts";
 import { ATTEND_REWARDS, checkIn, claimQuests, questStatus } from "./care/Daily.ts";
 import { MEMORIES } from "./story/memories.ts";
 import { MiniGames, type GameResult } from "./ui/MiniGames.ts";
@@ -63,6 +64,11 @@ const SENSORY_LABEL: Record<SensoryGroup, string> = L<Record<SensoryGroup, strin
 });
 applyStaticText();
 const METER_MAX_HZ = 150;
+
+// 다른 탭에서 이미 키우는 중이면 그 탭이 닫힐 때까지 기다린다 (저장이 서로 덮이지 않게)
+await claimTab(() => {
+  $("load-label").textContent = L("다른 탭에서 이미 깨어 있어요. 그 탭을 닫으면 여기서 이어져요.", "She's already awake in another tab. Close that tab to continue here.");
+});
 
 // ---------------------------------------------------------------- 상태
 const care = Care.load(Date.now(), TIME_SCALE);
