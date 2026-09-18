@@ -236,9 +236,10 @@ export class Animator {
     (acc.head ??= [0, 0, 0])[1] += lead;
     (acc.spine ??= [0, 0, 0])[1] += lead * 0.3;
 
+    const f = this.rig.flipXZ ? -1 : 1;
     for (const b of BONES) {
       const v = acc[b];
-      this.rig.bone(b)?.rotation.set(v?.[0] ?? 0, v?.[1] ?? 0, v?.[2] ?? 0);
+      this.rig.bone(b)?.rotation.set(f * (v?.[0] ?? 0), v?.[1] ?? 0, f * (v?.[2] ?? 0));
     }
     this.poseRoot.position.y = this.rig.hipsHeight + rootY;
     this.poseRoot.rotation.set(pitch, 0, roll);

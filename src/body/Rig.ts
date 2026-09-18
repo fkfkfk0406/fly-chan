@@ -29,6 +29,11 @@ export interface Rig {
   readonly hipsHeight: number;
   /** 모델 전체 키 (m) */
   readonly height: number;
+  /**
+   * VRM 0.x: 정면을 돌려 맞춰도 정규화 본의 축은 옛 방향(-Z 정면)이라
+   * 규약대로 돌리려면 X·Z 회전 부호를 뒤집어야 한다.
+   */
+  readonly flipXZ?: boolean;
   bone(name: BoneName): THREE.Object3D | undefined;
   /** 액세서리를 붙일 실제 렌더 노드 */
   attachNode(name: "head" | "neck" | "upperChest"): THREE.Object3D | undefined;
@@ -64,6 +69,7 @@ export async function loadVrmRig(url: string, onProgress?: (ratio: number) => vo
     object: vrm.scene,
     hipsHeight,
     height: box.max.y - box.min.y,
+    flipXZ: vrm.meta.metaVersion === "0",
     bone: (name) => vrm.humanoid.getNormalizedBoneNode(name) ?? undefined,
     attachNode: (name) => vrm.humanoid.getRawBoneNode(name) ?? undefined,
     setExpression: (name, w) => vrm.expressionManager?.setValue(name, w),
