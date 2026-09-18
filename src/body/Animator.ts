@@ -28,6 +28,8 @@ interface Ctx {
 }
 
 const ARM_DOWN = 1.2;
+/** 가끔 날개를 팔락이는 시간 (s) */
+const FLUTTER_SEC = 0.8;
 
 function base(c: Ctx): Pose {
   const breathe = Math.sin(c.t * 1.7) * 0.025;
@@ -171,6 +173,8 @@ export class Animator {
   private t = 0;
   private nextBlink = 2;
   private blinkStart = -1;
+  private nextFlutter = 5;
+  private flutterStart = -1;
   /** 대화 대사의 표정 (없으면 기분·행동으로 정함) */
   exprOverride: Expr | undefined;
   /** 대사가 찍히는 동안 입을 움직인다 */
@@ -262,6 +266,18 @@ export class Animator {
     for (const e of EXPRESSIONS) {
       const v = e === "blink" ? Math.max(expr.blink ?? 0, blink) : expr[e] ?? 0;
       this.rig.setExpression(e, Math.min(1, Math.max(0, v)));
+    }
+
+    // 가끔 날개를 팔락인다 (깨어 있고 날개를 편 동안)
+    if (t > this.nextFlutter) {
+      if (s.behavior !== "sleep" && fold < 0.3) this.flutterStart = t;
+      this.nextFlutter = t + 6 + Math.random() * 10;
+    }
+    const since = t - this.flutterStart;
+    if (since < FLUTTER_SEC) {
+      const env = Math.sin((since / FLUTTER_SEC) * Math.PI);
+      flap = Math.max(flap, 0.3 * env);
+      freq = Math.max(freq, 6);
     }
 
     this.parts.update(t, flap, freq, fold, twitch);

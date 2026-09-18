@@ -5,6 +5,9 @@ import type { Rig } from "./Rig.ts";
 export class FlyParts {
   private readonly antennae: THREE.Group[] = [];
   private readonly wings: THREE.Group[] = [];
+  /** 날갯짓 위상. 빈도가 바뀌어도 튀지 않게 시간 대신 쌓아 간다 */
+  private beatPhase = 0;
+  private lastT = 0;
 
   constructor(rig: Rig) {
     rig.object.updateMatrixWorld(true);
@@ -81,9 +84,11 @@ export class FlyParts {
   update(t: number, flap: number, freq: number, fold: number, twitch: number): void {
     const q = new THREE.Quaternion();
     const e = new THREE.Euler();
+    this.beatPhase += (t - this.lastT) * freq * Math.PI * 2;
+    this.lastT = t;
+    const beat = Math.sin(this.beatPhase) * flap;
     this.wings.forEach((w, k) => {
       const s = k === 0 ? 1 : -1;
-      const beat = Math.sin(t * freq * Math.PI * 2) * flap;
       e.set(0, s * (0.35 + beat), s * -fold * 1.1);
       w.quaternion.copy(w.userData.rest).multiply(q.setFromEuler(e));
     });
