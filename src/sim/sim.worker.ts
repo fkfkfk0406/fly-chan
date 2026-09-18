@@ -41,7 +41,8 @@ async function fetchBuffer(name: string, loaded: { bytes: number; total: number 
   const res = await fetchAsset(`data/${name}`);
   if (!res.ok || !res.body) throw new Error(L(`${name} 을 불러오지 못했습니다 (${res.status}). npm run data 를 먼저 실행하세요.`, `Could not load ${name} (${res.status}). Run npm run data first.`));
   const reader = res.body.getReader();
-  const size = Number(res.headers.get("content-length")) || 0;
+  // gzip 등으로 압축해 보내면 content-length 는 압축된 크기라 비교할 수 없다 (GitHub Pages)
+  const size = res.headers.get("content-encoding") ? 0 : Number(res.headers.get("content-length")) || 0;
   const chunks: Uint8Array[] = [];
   let got = 0;
   for (;;) {
